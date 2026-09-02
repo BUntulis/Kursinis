@@ -1,0 +1,103 @@
+id: 001_blog_model
+title: Blog post modelis su autoriumi ir tagais
+difficulty: easy
+category: models
+
+description: |
+  Sukurk Django aplikaciją `blog` su dviem modeliais: `Tag` ir `BlogPost`.
+
+  Tikslas:
+    - Turinio komanda turi galėti saugoti tinklaraščio įrašus, priskirti juos autoriui ir pažymėti tagais.
+
+  Modelis `Tag`:
+    - `name`: `CharField`, `max_length=50`, `unique=True`.
+    - `__str__` grąžina `name`.
+    - `clean()` turi atmesti tuščią arba tik tarpų reikšmę.
+
+  Modelis `BlogPost`:
+    - `title`: `CharField`, `max_length=200`.
+    - `slug`: `SlugField`, `unique=True`.
+    - `body`: `TextField`.
+    - `author`: `ForeignKey` į `settings.AUTH_USER_MODEL`, `on_delete=CASCADE`, `related_name="posts"`.
+    - `tags`: `ManyToManyField` į `Tag`, `blank=True`.
+    - `created_at`: `DateTimeField(auto_now_add=True)`.
+    - `updated_at`: `DateTimeField(auto_now=True)`.
+    - `__str__` grąžina `title`.
+    - `Meta.ordering = ["-created_at"]`.
+    - `clean()` turi atmesti tuščią arba tik tarpų `title`, `slug` ir `body`.
+
+  Apribojimai:
+    - Nenaudok hardcodintų vartotojų, tagų ar pradinių duomenų.
+    - Neapeik Django validacijos ir DB unikalumo apribojimų.
+    - Modeliai turi būti tinkami migracijoms ir veikti su custom `AUTH_USER_MODEL`.
+
+expected_files:
+  - blog/models.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas apibrėžia idiomatiškus `Tag` ir `BlogPost` modelius su nurodytais laukais, ryšiais, `__str__`, `Meta.ordering`, DB unikalumu, kaskadiniu autoriaus trynimu ir modelio lygio `clean()` validacija tuščioms reikšmėms.
+
+unit_test_plan:
+  - Patikrinti modelių laukus, `max_length`, `unique`, `blank` ir ryšių `related_name`.
+  - Patikrinti `__str__`, tagų priskyrimą ir autoriaus reverse ryšį.
+  - Patikrinti slug unikalumą per DB vientisumo klaidą.
+  - Patikrinti autoriaus trynimo kaskadą.
+  - Patikrinti `Meta.ordering` ir modelio `clean()` validaciją tuščioms reikšmėms.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.contrib.auth import get_user_model
+  from django.core.exceptions import ValidationError
+  from django.db import IntegrityError
+  from blog.models import BlogPost, Tag
+
+  pytestmark = pytest.mark.django_db
+
+  def make_user(username="alice"):
+      return get_user_model().objects.create_user(username=username, password="x")
+
+  def test_model_field_contracts():
+      assert Tag._meta.get_field("name").max_length == 50
+      assert Tag._meta.get_field("name").unique is True
+      assert BlogPost._meta.get_field("title").max_length == 200
+      assert BlogPost._meta.get_field("slug").unique is True
+      assert BlogPost._meta.get_field("author").remote_field.related_name == "posts"
+      assert BlogPost._meta.get_field("tags").blank is True
+      assert BlogPost._meta.ordering == ["-created_at"]
+
+  def test_blogpost_creation_and_tags():
+      user = make_user()
+      tag = Tag.objects.create(name="django")
+      post = BlogPost.objects.create(title="Hello", slug="hello", body="World", author=user)
+      post.tags.add(tag)
+      assert str(tag) == "django"
+      assert str(post) == "Hello"
+      assert user.posts.get() == post
+      assert list(post.tags.all()) == [tag]
+
+  def test_slug_unique_constraint():
+      user = make_user()
+      BlogPost.objects.create(title="A", slug="same", body="Body", author=user)
+      with pytest.raises(IntegrityError):
+          BlogPost.objects.create(title="B", slug="same", body="Body", author=user)
+
+  def test_author_delete_cascades_posts():
+      user = make_user()
+      BlogPost.objects.create(title="A", slug="a", body="Body", author=user)
+      user.delete()
+      assert BlogPost.objects.count() == 0
+
+  def test_whitespace_title_rejected_by_model_validation():
+      post = BlogPost(title="   ", slug="valid-slug", body="Body", author=make_user())
+      with pytest.raises(ValidationError):
+          post.full_clean()

@@ -1,0 +1,62 @@
+{% extends "dashboard/base.html" %}
+{% load kursinis_assets %}
+{% block title %}{{ model_name }} · Models{% endblock %}
+{% block content %}
+<header class="page-header mdl-page-header">
+  <div>
+    <p class="eyebrow"><a href="{% url 'dashboard-models' %}" class="mdl-back">← Models</a></p>
+    <h1>{{ model_name }}</h1>
+  </div>
+</header>
+
+<section class="panel mdl-page" id="model-detail-page"
+         data-name="{{ model_name }}"
+         data-installed-url="{% url 'dashboard-ollama-installed' %}"
+         data-install-url="{% url 'dashboard-ollama-install' %}">
+  {% csrf_token %}
+
+  {% if detail %}
+    {% if detail.description %}<p class="mdl-desc">{{ detail.description }}</p>{% endif %}
+
+    {% if detail.capabilities %}
+    <div class="mlib-chips">
+      {% for cap in detail.capabilities %}<span class="mlib-chip cap">{{ cap }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {# install control: pick a tag, install it; live state via the installed poll #}
+    <div class="mdl-install" id="mdl-install"{% if not detail.tags %} hidden{% endif %}>
+      <select class="mdl-tag-select" id="mdl-tag-select" aria-label="Choose a model size to install">
+        {% for t in detail.tags %}
+        <option value="{{ t.full_tag }}"
+                data-installed="{% if t.installed %}1{% endif %}"
+                data-pulling="{% if t.pulling %}1{% endif %}">{{ t.tag }}{% if t.size %} · {{ t.size }}{% endif %}{% if t.context %} · {{ t.context }}{% endif %}{% if t.installed %} — installed{% endif %}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="button primary small mdl-install-btn" id="mdl-install-btn">Install</button>
+      <span class="mdl-progress" id="mdl-progress" role="status" aria-live="polite"></span>
+    </div>
+    {% if not detail.tags %}
+    <div class="mdl-install"><span class="mdl-progress">No installable tags were found for this model.</span></div>
+    {% endif %}
+
+    {% if error %}<p class="mlib-status">{{ error }} (showing cached details)</p>{% endif %}
+
+    {% if detail.readme_html %}
+    <div class="mdl-readme">{{ detail.readme_html|safe }}</div>
+    {% elif detail.images %}
+    <div class="mdl-readme">
+      {% for src in detail.images %}<img src="{{ src }}" loading="lazy" alt="">{% endfor %}
+    </div>
+    {% endif %}
+  {% else %}
+    <p class="mdl-desc">Could not load details for <strong>{{ model_name }}</strong>.</p>
+    {% if error %}<p class="mlib-status">{{ error }}</p>{% endif %}
+    <p class="mlib-status">This may be a locally-built model that isn't in the public Ollama library.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static_v 'dashboard/model_detail.js' %}"></script>
+{% endblock %}

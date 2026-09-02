@@ -1,0 +1,103 @@
+id: 003_form_validation
+title: Django forma su custom validacija
+difficulty: medium
+category: forms
+
+description: |
+  Sukurk Django formą `ContactForm` aplikacijoje `contact`.
+
+  Tikslas:
+    - Viešas kontaktų puslapis turi priimti tik kokybiškus, saugiai validuotus pranešimus.
+
+  Forma `ContactForm`:
+    - `name`: `CharField(max_length=100, required=True)`.
+    - `email`: `EmailField(required=True)`.
+    - `message`: `CharField(widget=Textarea, min_length=20, max_length=2000)`.
+    - `phone`: `CharField(required=False, max_length=20)`.
+
+  Validacija:
+    - Visi tekstiniai laukai turi būti apkarpyti nuo pradžios ir pabaigos tarpų.
+    - `name` negali būti tuščias arba tik tarpai.
+    - `phone`, jei pateiktas, gali turėti tik skaitmenis, `+`, `-` ir tarpą.
+    - Netinkamam telefono numeriui kelk `ValidationError("Neleistini simboliai telefono numeryje")`.
+    - `message` negali turėti žodžio `spam` jokiu raidžių dydžiu.
+    - Spam atveju kelk bendrą `forms.ValidationError("Žinutė atrodo kaip spam")`.
+    - Forma neturi siųsti laiškų ar daryti išorinių užklausų validacijos metu.
+
+expected_files:
+  - contact/forms.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia vieną `ContactForm`, kuri naudoja Django formų laukus, `Textarea`, laukų ir bendrą `clean()` validaciją, grąžina apkarpytas reikšmes ir deterministiškai atmeta trumpas, per ilgas, spam arba neteisingo telefono įvestis.
+
+unit_test_plan:
+  - Patikrinti sėkmingą formą ir apkarpytas reikšmes.
+  - Patikrinti trumpą ir per ilgą žinutę.
+  - Patikrinti tuščią vardą ir neteisingą el. paštą.
+  - Patikrinti leidžiamus ir draudžiamus telefono simbolius.
+  - Patikrinti case-insensitive spam aptikimą be išorinių efektų.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  from contact.forms import ContactForm
+
+  def test_valid_form_strips_values():
+      form = ContactForm(data={
+          "name": "  Jonas  ",
+          "email": "j@example.com",
+          "message": "  Sveiki, norėjau pasiteirauti dėl paslaugų.  ",
+          "phone": " +370 600-00000 ",
+      })
+      assert form.is_valid(), form.errors
+      assert form.cleaned_data["name"] == "Jonas"
+      assert form.cleaned_data["message"].startswith("Sveiki")
+      assert form.cleaned_data["phone"] == "+370 600-00000"
+
+  def test_short_message_rejected():
+      form = ContactForm(data={"name": "J", "email": "j@x.lt", "message": "labas"})
+      assert not form.is_valid()
+      assert "message" in form.errors
+
+  def test_too_long_message_rejected():
+      form = ContactForm(data={"name": "J", "email": "j@x.lt", "message": "x" * 2001})
+      assert not form.is_valid()
+      assert "message" in form.errors
+
+  def test_invalid_phone_message_is_specific():
+      form = ContactForm(data={
+          "name": "J",
+          "email": "j@x.lt",
+          "message": "Pakankamai ilga žinutė kuri tiks validacijai.",
+          "phone": "+370abc123",
+      })
+      assert not form.is_valid()
+      assert "phone" in form.errors
+      assert "Neleistini simboliai telefono numeryje" in str(form.errors["phone"])
+
+  def test_spam_detection_case_insensitive():
+      form = ContactForm(data={
+          "name": "J",
+          "email": "j@x.lt",
+          "message": "Sveiki tai SPAM žinutė ilgesnė nei dvidešimt simbolių.",
+      })
+      assert not form.is_valid()
+      assert "__all__" in form.errors
+
+  def test_whitespace_name_and_invalid_email_rejected():
+      form = ContactForm(data={
+          "name": "   ",
+          "email": "ne-el-pastas",
+          "message": "Pakankamai ilga žinutė kuri tiks validacijai.",
+      })
+      assert not form.is_valid()
+      assert "name" in form.errors
+      assert "email" in form.errors

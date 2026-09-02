@@ -1,0 +1,124 @@
+id: 002_rest_api_crud
+title: DRF CRUD API knygoms
+difficulty: medium
+category: drf
+
+description: |
+  Sukurk Django REST Framework CRUD API aplikacijoje `library`.
+
+  Tikslas:
+    - Bibliotekos darbuotojai turi galėti kurti, redaguoti ir šalinti knygas.
+    - Vieši vartotojai gali tik peržiūrėti sąrašą ir detales.
+
+  Modelis `Book`:
+    - `title`: `CharField(max_length=200)`.
+    - `author`: `CharField(max_length=100)`.
+    - `isbn`: `CharField(max_length=13, unique=True)`.
+    - `published_year`: `IntegerField`.
+    - `__str__` grąžina `title`.
+
+  Serializeris `BookSerializer`:
+    - `ModelSerializer`, visi modelio laukai.
+    - ISBN turi būti tik skaitmenys, ilgis 10 arba 13.
+    - `published_year` turi būti tarp 1450 ir einamųjų metų imtinai.
+    - `title` ir `author` neturi būti tušti arba tik tarpai.
+
+  Vaizdai ir URL:
+    - `BookViewSet(ModelViewSet)` su `queryset = Book.objects.all().order_by("title")`.
+    - `permission_classes = [IsAuthenticatedOrReadOnly]`.
+    - URL'ai per `DefaultRouter`, prefix `"books"`, registruoti `library/urls.py`.
+
+  Apribojimai:
+    - Nenaudok hardcodintų atsakymų ar rankiniu būdu suformuotų JSON payloadų vietoje serializerio.
+    - Klaidoms naudok DRF validacijos mechanizmą ir tinkamus HTTP statuso kodus.
+    - API turi veikti su standartiniu DRF `APIClient`.
+
+expected_files:
+  - library/models.py
+  - library/serializers.py
+  - library/views.py
+  - library/urls.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia `Book` modelį, validuojantį `BookSerializer`, `ModelViewSet` su `IsAuthenticatedOrReadOnly`, routeriu registruotą `/books/` API ir tikrus DRF atsakymus su 201/200/204/400/401 arba 403 statusais.
+
+unit_test_plan:
+  - Patikrinti modelio laukus, unikalų ISBN ir `__str__`.
+  - Patikrinti viešą sąrašą ir autentifikuotą CRUD.
+  - Patikrinti, kad anonimas negali kurti, redaguoti ar šalinti.
+  - Patikrinti serializerio validaciją ISBN, metų intervalui ir tuštiems laukams.
+  - Patikrinti duplicate ISBN klaidą per API.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.contrib.auth import get_user_model
+  from django.utils import timezone
+  from rest_framework.test import APIClient
+  from library.models import Book
+
+  pytestmark = pytest.mark.django_db
+
+  @pytest.fixture
+  def client():
+      return APIClient()
+
+  @pytest.fixture
+  def user():
+      return get_user_model().objects.create_user("librarian", password="x")
+
+  def test_model_contract():
+      assert Book._meta.get_field("title").max_length == 200
+      assert Book._meta.get_field("author").max_length == 100
+      assert Book._meta.get_field("isbn").max_length == 13
+      assert Book._meta.get_field("isbn").unique is True
+      assert str(Book(title="Clean Code", author="Martin", isbn="9780132350884", published_year=2008)) == "Clean Code"
+
+  def test_public_can_list_books(client):
+      Book.objects.create(title="A", author="B", isbn="1234567890", published_year=2000)
+      resp = client.get("/books/")
+      assert resp.status_code == 200
+      payload = resp.json()
+      assert len(payload) == 1
+      assert payload[0]["title"] == "A"
+
+  def test_anonymous_cannot_create(client):
+      resp = client.post("/books/", {"title": "A", "author": "B", "isbn": "1234567890", "published_year": 2000}, format="json")
+      assert resp.status_code in (401, 403)
+      assert Book.objects.count() == 0
+
+  def test_authenticated_crud(client, user):
+      client.force_authenticate(user)
+      resp = client.post("/books/", {"title": "Clean Code", "author": "Martin", "isbn": "9780132350884", "published_year": 2008}, format="json")
+      assert resp.status_code == 201, resp.content
+      book = Book.objects.get()
+      patch = client.patch(f"/books/{book.pk}/", {"title": "Refactoring"}, format="json")
+      assert patch.status_code == 200
+      book.refresh_from_db()
+      assert book.title == "Refactoring"
+      delete = client.delete(f"/books/{book.pk}/")
+      assert delete.status_code == 204
+      assert Book.objects.count() == 0
+
+  def test_invalid_isbn_and_year_return_400(client, user):
+      client.force_authenticate(user)
+      resp = client.post("/books/", {"title": "A", "author": "B", "isbn": "bad-isbn", "published_year": timezone.now().year + 1}, format="json")
+      assert resp.status_code == 400
+      assert "isbn" in resp.json()
+      assert "published_year" in resp.json()
+
+  def test_duplicate_isbn_rejected_by_api(client, user):
+      Book.objects.create(title="A", author="B", isbn="1234567890", published_year=2000)
+      client.force_authenticate(user)
+      resp = client.post("/books/", {"title": "C", "author": "D", "isbn": "1234567890", "published_year": 2001}, format="json")
+      assert resp.status_code == 400
+      assert "isbn" in resp.json()

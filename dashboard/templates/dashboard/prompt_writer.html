@@ -1,0 +1,61 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Prompt writer · DI testavimo platforma{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;">
+  <div class="eyebrow">PROMPT WRITER</div>
+  <h1 style="margin:4px 0 6px;font-weight:300;">Turn an idea into a buildable prompt</h1>
+  <p style="color:var(--text-muted);margin:0 0 18px;font-size:14px;">
+    Describe a rough web idea. The model asks a few clarifying questions, then writes a structured
+    prompt you can hand off to a <strong>project</strong> (build it) or a <strong>benchmark</strong>
+    (the model also generates the reference tests).
+  </p>
+
+  {% if error %}<div class="panel" style="padding:12px 16px;margin-bottom:14px;color:#ff9d96;">{{ error }}</div>{% endif %}
+
+  <form method="post" action="{% url 'dashboard-prompt-writer' %}" class="pform">
+    {% csrf_token %}
+
+    <div class="pform-field">
+      <label>What's your web idea?</label>
+      <textarea name="prompt" rows="5" required placeholder="e.g. A site where teachers post assignments and students submit answers…">{{ initial_prompt }}</textarea>
+    </div>
+
+    <div class="pform-grid">
+      <div class="pform-field">
+        <label>Model</label>
+        <select name="model">
+          <option value="">Auto (installed coder model)</option>
+          {% for m in models %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="pform-field">
+        <label>Effort</label>
+        <select name="effort">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="pform-toggles">
+      <label class="pform-check"><input type="checkbox" name="thinking" checked> Thinking</label>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button class="button primary" type="submit">Refine my idea ▶</button>
+      <a class="button" href="{% url 'dashboard-projects' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<style>
+  .pform { display:flex; flex-direction:column; gap:16px; }
+  .pform-field { display:flex; flex-direction:column; gap:6px; }
+  .pform-field > label { color:var(--text-muted); font-size:13px; }
+  .pform-field textarea, .pform-field select { padding:9px 12px; font-size:14px; }
+  .pform-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pform-toggles { display:flex; flex-wrap:wrap; gap:18px; }
+  .pform-check { display:flex; align-items:center; gap:7px; color:var(--text); font-size:13px; }
+</style>
+{% endblock %}

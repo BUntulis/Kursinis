@@ -1,0 +1,91 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+{% load kursinis_assets %}
+{% block title %}Settings · AI testing platform{% endblock %}
+{% block content %}
+{% firstof user.first_name user.get_username as display_name %}
+<div class="settings-wrap" id="settings-page" data-active-tab="{{ active_tab }}">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Account</p>
+      <h1>Settings</h1>
+    </div>
+  </header>
+
+  <div class="settings-body">
+    <nav class="settings-nav" role="tablist" aria-label="Settings sections">
+      <a class="settings-nav-item {% if active_tab == 'profile' %}active{% endif %}" href="?tab=profile" data-tab="profile" role="tab" id="settab-profile" aria-controls="setpanel-profile" aria-selected="{% if active_tab == 'profile' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'profile' %}0{% else %}-1{% endif %}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Profile
+      </a>
+      <a class="settings-nav-item {% if active_tab == 'preferences' %}active{% endif %}" href="?tab=preferences" data-tab="preferences" role="tab" id="settab-preferences" aria-controls="setpanel-preferences" aria-selected="{% if active_tab == 'preferences' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'preferences' %}0{% else %}-1{% endif %}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
+        Preferences
+      </a>
+      <a class="settings-nav-item {% if active_tab == 'help' %}active{% endif %}" href="?tab=help" data-tab="help" role="tab" id="settab-help" aria-controls="setpanel-help" aria-selected="{% if active_tab == 'help' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'help' %}0{% else %}-1{% endif %}">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        Help
+      </a>
+    </nav>
+
+    <div class="settings-content">
+      {# -------- Profile -------- #}
+      <section class="settings-panel" data-panel="profile" id="setpanel-profile" role="tabpanel" aria-labelledby="settab-profile" tabindex="0" {% if active_tab != 'profile' %}hidden{% endif %}>
+        <h2 class="settings-h2">Profile</h2>
+        <div class="settings-profile">
+          <span class="settings-avatar">{{ display_name|first|upper }}</span>
+          <div class="settings-profile-fields">
+            <div class="settings-field"><span class="settings-field-label">Name</span><span class="settings-field-value">{{ display_name }}</span></div>
+            <div class="settings-field"><span class="settings-field-label">Email</span><span class="settings-field-value">{{ user.get_username }}</span></div>
+            {% if user.date_joined %}<div class="settings-field"><span class="settings-field-label">Member since</span><span class="settings-field-value">{{ user.date_joined|date:"M j, Y" }}</span></div>{% endif %}
+          </div>
+        </div>
+        <form method="post" action="{% url 'dashboard-signout' %}" class="settings-signout-form">{% csrf_token %}
+          <button type="submit" class="button danger">Sign out</button>
+        </form>
+      </section>
+
+      {# -------- Preferences (real, localStorage-backed UI prefs) -------- #}
+      <section class="settings-panel" data-panel="preferences" id="setpanel-preferences" role="tabpanel" aria-labelledby="settab-preferences" tabindex="0" {% if active_tab != 'preferences' %}hidden{% endif %}>
+        <h2 class="settings-h2">Preferences</h2>
+        <label class="settings-toggle">
+          <span class="settings-toggle-text">
+            <span class="settings-toggle-title">Keep the sidebar expanded</span>
+            <span class="settings-toggle-desc">Show labels next to the navigation icons by default.</span>
+          </span>
+          <input type="checkbox" id="pref-sidebar" class="settings-switch">
+        </label>
+        <label class="settings-toggle">
+          <span class="settings-toggle-text">
+            <span class="settings-toggle-title">Reduce interface animations</span>
+            <span class="settings-toggle-desc">Turn off icon hover effects and transitions.</span>
+          </span>
+          <input type="checkbox" id="pref-reduce-motion" class="settings-switch">
+        </label>
+      </section>
+
+      {# -------- Help -------- #}
+      <section class="settings-panel" data-panel="help" id="setpanel-help" role="tabpanel" aria-labelledby="settab-help" tabindex="0" {% if active_tab != 'help' %}hidden{% endif %}>
+        <h2 class="settings-h2">Help</h2>
+        <div class="settings-help-block">
+          <h3 class="settings-h3">Keyboard shortcuts</h3>
+          <ul class="settings-kbd-list">
+            <li><kbd>Enter</kbd> Send a message</li>
+            <li><kbd>Shift</kbd> + <kbd>Enter</kbd> New line</li>
+            <li><kbd>Esc</kbd> Close a dialog or menu</li>
+            <li><kbd>/</kbd> Open the composer actions palette</li>
+          </ul>
+        </div>
+        <div class="settings-help-block">
+          <h3 class="settings-h3">About</h3>
+          <p class="settings-help-text">A dashboard for building Django projects with local Ollama models and benchmarking how they perform. Create a chat to start a project, browse and install models on the Models page, and manage everything from one place.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static_v 'dashboard/settings.js' %}"></script>
+{% endblock %}

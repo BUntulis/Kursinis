@@ -1,0 +1,92 @@
+id: 012_template_tags
+title: Custom template tagas ir filtras
+difficulty: medium
+category: templates
+
+description: |
+  Sukurk `utils` aplikacijos custom template filtrą ir tagą.
+
+  Tikslas:
+    - Šablonai turi turėti saugų žodžių trumpinimą ir paprastą skaitinį daugybos tagą.
+
+  Failų struktūra:
+    - `utils/__init__.py`.
+    - `utils/templatetags/__init__.py`.
+    - `utils/templatetags/utils_extras.py`.
+
+  `utils_extras.py`:
+    - `register = template.Library()`.
+    - Filtras `truncate_words_safe`:
+        * Registruotas kaip `@register.filter(name="truncate_words_safe")`.
+        * Naudojimas: `{{ text|truncate_words_safe:5 }}`.
+        * Trumpina pagal žodžius, ne simbolius.
+        * Jei žodžių yra daugiau nei N, grąžina pirmus N žodžių ir prideda `...` be papildomo tarpo prieš daugtaškį.
+        * Jei žodžių yra N arba mažiau, grąžina originalų tekstą be daugtaškio.
+        * Jei N yra 0 arba mažiau, grąžina tuščią stringą.
+        * Tuščiam arba `None` tekstui grąžina tuščią stringą.
+    - Simple tag `multiply`:
+        * Registruotas kaip `@register.simple_tag(name="multiply")`.
+        * Priima du skaičius (`int` arba `float`) ir grąžina jų sandaugą.
+        * Jei abu argumentai yra sveikieji skaičiai, rezultatas turi būti sveikojo skaičiaus forma, pvz. `12`.
+        * Float atveju priimtina standartinė Python skaitinė reprezentacija.
+
+  Apribojimai:
+    - Nenaudok Django built-in `truncatewords` kaip vienintelės implementacijos.
+    - Nenaudok globalios mutable būsenos.
+    - Filtras neturi kelti klaidos tuščiam tekstui.
+
+expected_files:
+  - utils/__init__.py
+  - utils/templatetags/__init__.py
+  - utils/templatetags/utils_extras.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia Django template library modulį su `truncate_words_safe` filtru, kuris deterministiškai trumpina pagal žodžius ir tvarko tuščią įvestį, bei `multiply` simple tagą, kuris korektiškai daugina int ir float reikšmes.
+
+unit_test_plan:
+  - Patikrinti filtro registravimą per realų `Template`.
+  - Patikrinti trumpą, tiksliai ribinį, per ilgą ir tuščią tekstą.
+  - Patikrinti N <= 0 elgseną.
+  - Patikrinti `multiply` su sveikaisiais ir float skaičiais.
+  - Patikrinti, kad daugtaškis pridedamas tik kai tekstas iš tikrųjų trumpinamas.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  from django.template import Context, Template
+
+  def render(src, ctx=None):
+      return Template("{% load utils_extras %}" + src).render(Context(ctx or {}))
+
+  def test_truncate_short_unchanged():
+      out = render("{{ s|truncate_words_safe:5 }}", {"s": "one two three"})
+      assert out == "one two three"
+
+  def test_truncate_exact_limit_has_no_ellipsis():
+      out = render("{{ s|truncate_words_safe:3 }}", {"s": "one two three"})
+      assert out == "one two three"
+
+  def test_truncate_long_by_words():
+      out = render("{{ s|truncate_words_safe:3 }}", {"s": "a b c d e"})
+      assert out == "a b c..."
+
+  def test_truncate_zero_and_empty_input():
+      assert render("{{ s|truncate_words_safe:0 }}", {"s": "a b c"}) == ""
+      assert render("{{ s|truncate_words_safe:5 }}", {"s": ""}) == ""
+      assert render("{{ s|truncate_words_safe:5 }}", {"s": None}) == ""
+
+  def test_multiply_integers():
+      out = render("{% multiply 3 4 %}")
+      assert out == "12"
+
+  def test_multiply_floats():
+      out = render("{% multiply 1.5 2 %}")
+      assert out in {"3.0", "3"}

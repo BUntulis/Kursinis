@@ -1,0 +1,102 @@
+id: 004_custom_user
+title: Custom User modelis su email kaip USERNAME_FIELD
+difficulty: medium
+category: auth
+
+description: |
+  Sukurk custom user modelį aplikacijoje `accounts`.
+
+  Tikslas:
+    - Sistema turi autentifikuoti vartotojus pagal el. paštą, ne pagal username.
+
+  Modelis `User`:
+    - Paveldi `AbstractBaseUser` ir `PermissionsMixin`.
+    - `email`: `EmailField(unique=True)`.
+    - `full_name`: `CharField(max_length=150)`.
+    - `is_active`: `BooleanField(default=True)`.
+    - `is_staff`: `BooleanField(default=False)`.
+    - `date_joined`: `DateTimeField(auto_now_add=True)`.
+    - `USERNAME_FIELD = "email"`.
+    - `REQUIRED_FIELDS = ["full_name"]`.
+    - `objects = UserManager()`.
+    - `__str__` grąžina `email`.
+
+  Manageris `UserManager(BaseUserManager)`:
+    - `create_user(email, password=None, **extra_fields)`.
+    - Jei `email` nepateiktas arba tuščias, kelia `ValueError`.
+    - Normalizuoja el. paštą per `normalize_email`.
+    - Saugo slaptažodį per `set_password`, niekada plain text.
+    - `create_superuser(email, password=None, **extra_fields)`.
+    - Superuser turi priverstinai turėti `is_staff=True` ir `is_superuser=True`.
+    - Jei superuser kviečiamas su `is_staff=False` arba `is_superuser=False`, kelia `ValueError`.
+
+  Apribojimai:
+    - Nenaudok `username` lauko.
+    - Nenaudok hardcodintų slaptažodžių ar vartotojų.
+    - Modelis turi būti suderinamas su `AUTH_USER_MODEL = "accounts.User"`.
+
+expected_files:
+  - accounts/models.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas apibrėžia custom `User` modelį ir `UserManager`, kuriame el. paštas yra autentifikacijos identifikatorius, slaptažodžiai hashinami, superuser flag'ai tikrinami, o DB užtikrina unikalius el. paštus.
+
+unit_test_plan:
+  - Patikrinti modelio laukus, `USERNAME_FIELD`, `REQUIRED_FIELDS` ir `__str__`.
+  - Patikrinti `create_user` normalizaciją, slaptažodžio hashinimą ir staff default reikšmę.
+  - Patikrinti tuščio el. pašto klaidą.
+  - Patikrinti `create_superuser` teises ir flag'ų apsaugą.
+  - Patikrinti el. pašto unikalumą DB lygiu.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.db import IntegrityError
+  from accounts.models import User
+
+  pytestmark = pytest.mark.django_db
+
+  def test_model_contract():
+      assert User.USERNAME_FIELD == "email"
+      assert User.REQUIRED_FIELDS == ["full_name"]
+      assert User._meta.get_field("email").unique is True
+      assert User._meta.get_field("full_name").max_length == 150
+
+  def test_create_user_normalizes_email_and_hashes_password():
+      user = User.objects.create_user(email="Alice@Example.COM", password="pw", full_name="Alice")
+      assert user.email == "Alice@example.com"
+      assert user.check_password("pw")
+      assert user.password != "pw"
+      assert user.is_staff is False
+      assert user.is_active is True
+      assert str(user) == "Alice@example.com"
+
+  def test_create_user_requires_email():
+      with pytest.raises(ValueError):
+          User.objects.create_user(email="", password="pw", full_name="Alice")
+
+  def test_create_superuser_sets_required_flags():
+      user = User.objects.create_superuser(email="root@example.com", password="pw", full_name="Root")
+      assert user.is_staff is True
+      assert user.is_superuser is True
+      assert user.check_password("pw")
+
+  def test_create_superuser_rejects_false_flags():
+      with pytest.raises(ValueError):
+          User.objects.create_superuser(email="a@example.com", password="pw", full_name="A", is_staff=False)
+      with pytest.raises(ValueError):
+          User.objects.create_superuser(email="b@example.com", password="pw", full_name="B", is_superuser=False)
+
+  def test_email_unique():
+      User.objects.create_user(email="a@example.com", password="pw", full_name="A")
+      with pytest.raises(IntegrityError):
+          User.objects.create_user(email="a@example.com", password="pw", full_name="B")

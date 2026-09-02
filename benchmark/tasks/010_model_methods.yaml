@@ -1,0 +1,101 @@
+id: 010_model_methods
+title: Modelio metodai ir properties
+difficulty: easy
+category: models
+
+description: |
+  Sukurk `orders` aplikacijos `Order` modelį su verslo metodais.
+
+  Tikslas:
+    - Užsakymo suma, mokesčiai ir būsenos perėjimai turi būti apskaičiuojami modelio lygyje.
+
+  Modelis `Order`:
+    - `total_amount`: `DecimalField(max_digits=10, decimal_places=2)` su validacija `>= 0`.
+    - `tax_rate`: `DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.21"))` su validacija nuo `0` iki `1`.
+    - `status`: `CharField(max_length=20, choices=[("pending","pending"), ("paid","paid"), ("cancelled","cancelled")], default="pending")`.
+    - `__str__` grąžina `Order #<pk>` jei `pk` yra, kitu atveju `Order`.
+
+  Elgsena:
+    - `total_with_tax` property grąžina `Decimal`: `total_amount * (1 + tax_rate)`, suapvalintą iki 2 skaičių po kablelio.
+    - `mark_paid()`:
+        * Jei status yra `"cancelled"`, kelia `ValueError`.
+        * Kitu atveju nustato `status="paid"`.
+        * Kviečia `self.save(update_fields=["status"])`.
+    - `is_finalized` property grąžina `True`, kai status yra `"paid"` arba `"cancelled"`.
+
+  Apribojimai:
+    - Nenaudok float pinigų skaičiavimams.
+    - Neperkelk šios logikos į view ar formą.
+    - Neignoruok neigiamų sumų validacijos.
+
+expected_files:
+  - orders/models.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia `Order` modelį su Decimal laukais ir validacija, tiksliu `total_with_tax` skaičiavimu, aiškiu `mark_paid()` statuso perėjimu ir `is_finalized` property, nenaudojant float ar view lygio logikos.
+
+unit_test_plan:
+  - Patikrinti laukus, choices, default reikšmes ir `__str__`.
+  - Patikrinti Decimal mokesčio skaičiavimą ir apvalinimą.
+  - Patikrinti `mark_paid()` iškviečia `save(update_fields=["status"])` ir persistina būseną.
+  - Patikrinti, kad atšauktas užsakymas negali būti pažymėtas kaip apmokėtas.
+  - Patikrinti neigiamų sumų modelio validaciją ir `is_finalized`.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from decimal import Decimal
+  from unittest.mock import patch
+  from django.core.exceptions import ValidationError
+  from orders.models import Order
+
+  pytestmark = pytest.mark.django_db
+
+  def test_model_contract():
+      assert Order._meta.get_field("total_amount").decimal_places == 2
+      assert Order._meta.get_field("tax_rate").default == Decimal("0.21")
+      assert Order._meta.get_field("status").default == "pending"
+      assert set(value for value, _ in Order._meta.get_field("status").choices) == {"pending", "paid", "cancelled"}
+
+  def test_total_with_tax_is_decimal_and_rounded():
+      order = Order.objects.create(total_amount=Decimal("10.00"), tax_rate=Decimal("0.21"))
+      assert order.total_with_tax == Decimal("12.10")
+      assert isinstance(order.total_with_tax, Decimal)
+
+  def test_mark_paid_persists_status():
+      order = Order.objects.create(total_amount=Decimal("10.00"))
+      order.mark_paid()
+      order.refresh_from_db()
+      assert order.status == "paid"
+
+  def test_mark_paid_uses_update_fields():
+      order = Order(total_amount=Decimal("10.00"))
+      with patch.object(Order, "save", autospec=True) as save_mock:
+          order.mark_paid()
+      assert order.status == "paid"
+      assert save_mock.call_args.kwargs["update_fields"] == ["status"]
+
+  def test_cancelled_order_cannot_be_marked_paid():
+      order = Order.objects.create(total_amount=Decimal("10.00"), status="cancelled")
+      with pytest.raises(ValueError):
+          order.mark_paid()
+      order.refresh_from_db()
+      assert order.status == "cancelled"
+
+  def test_is_finalized_and_negative_validation():
+      order = Order.objects.create(total_amount=Decimal("10.00"))
+      assert order.is_finalized is False
+      order.mark_paid()
+      assert order.is_finalized is True
+      invalid = Order(total_amount=Decimal("-0.01"))
+      with pytest.raises(ValidationError):
+          invalid.full_clean()

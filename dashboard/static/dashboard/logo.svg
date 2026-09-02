@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Kursinis">
+  <g stroke="#4287f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- left antenna: curved stalk + ring -->
+    <path d="M24 28 C20 24 18 21 17 17" fill="none"/>
+    <circle cx="16" cy="14.5" r="2.8" fill="none"/>
+    <!-- right antenna: stalk + ball -->
+    <path d="M40 28 L43.5 16.5" fill="none"/>
+    <circle cx="44" cy="15" r="2.6" fill="#4287f5" stroke="none"/>
+    <!-- wifi arcs -->
+    <path d="M47.5 12.2 A 5 5 0 0 1 50.6 17" fill="none"/>
+    <path d="M49.5 8.8 A 9 9 0 0 1 54.4 17" fill="none"/>
+  </g>
+  <!-- head -->
+  <rect x="14" y="26" width="36" height="30" rx="12" fill="#4287f5"/>
+  <!-- white visor -->
+  <rect x="20" y="32.5" width="24" height="15" rx="7" fill="#ffffff"/>
+  <!-- eyes -->
+  <circle cx="28" cy="40" r="2.7" fill="#4287f5"/>
+  <circle cx="36" cy="40" r="2.7" fill="#4287f5"/>
+  <!-- base / mouth -->
+  <path d="M27 56 H37 L34.4 62 H29.6 Z" fill="#ffffff"/>
+</svg>

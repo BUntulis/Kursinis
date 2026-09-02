@@ -1,0 +1,66 @@
+"""Dashboard URL maršrutai."""
+from __future__ import annotations
+
+from django.urls import path
+
+from . import api
+from . import views
+
+
+urlpatterns = [
+    path("", views.dashboard_home, name="dashboard"),
+    path("accounts/login/", views.signin, name="dashboard-signin"),
+    path("accounts/signup/", views.signup, name="dashboard-signup"),
+    path("accounts/signup/email-check/", views.signup_email_check, name="dashboard-signup-email-check"),
+    path("accounts/logout/", views.signout, name="dashboard-signout"),
+    path("settings/", views.settings_page, name="dashboard-settings"),
+    # ---- Project chat (primary creation surface) ----
+    path("projects/", views.projects, name="dashboard-projects"),
+    path("projects/new/", views.project_new, name="dashboard-project-new"),
+    path("projects/<int:pk>/", views.project_detail, name="dashboard-project-detail"),
+    path("projects/<int:pk>/update/", views.project_update, name="dashboard-project-update"),
+    path("projects/<int:pk>/chats/new/", views.project_new_chat, name="dashboard-project-new-chat"),
+    path("projects/<int:pk>/prompt-writer/", views.project_prompt_writer, name="dashboard-project-prompt-writer"),
+    path("prompt-writer/", views.prompt_writer, name="dashboard-prompt-writer"),
+    path("chats/<int:pk>/create/<str:kind>/", views.create_from_draft, name="dashboard-create-from-draft"),
+    path("projects/<int:pk>/delete/", views.project_delete, name="dashboard-project-delete"),
+    path("chats/<int:pk>/", views.project_chat, name="dashboard-project-chat"),
+    path("chats/<int:pk>/send/", views.chat_send, name="dashboard-chat-send"),
+    path("chats/<int:pk>/retry/", views.chat_retry, name="dashboard-chat-retry"),
+    path("chats/<int:pk>/stop/", views.chat_stop, name="dashboard-chat-stop"),
+    path("chats/<int:pk>/clear/", views.chat_clear, name="dashboard-chat-clear"),
+    path("chats/<int:pk>/compact/", views.chat_compact, name="dashboard-chat-compact"),
+    path("chats/<int:pk>/settings/", views.chat_settings_update, name="dashboard-chat-settings"),
+    path("chats/<int:pk>/plan/", views.chat_plan_update, name="dashboard-chat-plan"),
+    path("chats/<int:pk>/plan/refine/", views.chat_plan_refine, name="dashboard-chat-plan-refine"),
+    path("chats/<int:pk>/implement/", views.chat_implement, name="dashboard-chat-implement"),
+    path("chats/<int:pk>/rename/", views.chat_rename, name="dashboard-chat-rename"),
+    path("chats/<int:pk>/move/", views.chat_move, name="dashboard-chat-move"),
+    path("chats/<int:pk>/delete/", views.chat_delete, name="dashboard-chat-delete"),
+    path("api/chats/<int:pk>/logs/", views.chat_logs_api, name="dashboard-chat-logs"),
+    path("api/chats/<int:pk>/models/", views.chat_models_api, name="dashboard-chat-models"),
+    path("api/chats/<int:pk>/resources/", views.chat_resources_api, name="dashboard-chat-resources"),
+    path("api/projects/<int:pk>/file/", views.project_file_api, name="dashboard-project-file"),
+    path("api/projects/<int:pk>/upload/", views.project_upload_api, name="dashboard-project-upload"),
+    path("api/projects/<int:pk>/files/", views.project_files_api, name="dashboard-project-files"),
+    path("api/projects/<int:pk>/preview/<str:action>/", views.project_preview_api, name="dashboard-project-preview"),
+    path("api/projects/<int:pk>/database/", views.project_database_api, name="dashboard-project-database"),
+    path("api/interactions/<int:pk>/respond/", views.interaction_respond_api, name="dashboard-interaction-respond"),
+    path("models/", views.model_list, name="dashboard-models"),
+    path("models/new/", views.model_create, name="dashboard-model-create"),
+    path("models/library/<str:name>/", views.ollama_model_page, name="dashboard-ollama-model-page"),
+    path("models/<int:pk>/edit/", views.model_edit, name="dashboard-model-edit"),
+    path("models/<int:pk>/delete/", views.model_delete, name="dashboard-model-delete"),
+    path("api/ollama/library/", views.ollama_library_api, name="dashboard-ollama-library"),
+    path("api/ollama/library/<str:name>/", views.ollama_model_detail_api, name="dashboard-ollama-model"),
+    path("api/ollama/installed/", views.ollama_installed_api, name="dashboard-ollama-installed"),
+    path("api/ollama/install/", views.ollama_install_api, name="dashboard-ollama-install"),
+    path("api/ollama/remove/", views.ollama_remove_api, name="dashboard-ollama-remove"),
+    path("api/overview/", api.overview_api, name="dashboard-overview"),
+    path("api/tasks/", api.tasks_api, name="dashboard-tasks"),
+    path("api/tasks/<str:task_id>/", api.task_detail_api, name="dashboard-task-detail"),
+    path("api/results/", api.results_api, name="dashboard-results"),
+    path("api/jobs/", api.jobs_api, name="dashboard-jobs"),
+    path("api/jobs/<int:job_id>/", api.job_detail_api, name="dashboard-job-detail"),
+    path("api/jobs/<int:job_id>/cancel/", api.job_cancel_api, name="dashboard-job-cancel"),
+]

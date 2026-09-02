@@ -1,0 +1,30 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if mode == 'signup' %}Sign up{% else %}Sign in{% endif %} · DI testavimo platforma{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <h1 class="auth-title">{% if mode == 'signup' %}Create your account{% else %}Welcome back{% endif %}</h1>
+
+  <form method="post" class="auth-form" novalidate>
+    {% csrf_token %}
+    {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+    {% if form.non_field_errors %}<div class="auth-nonfield">{{ form.non_field_errors|striptags }}</div>{% endif %}
+    {% for field in form %}
+    <label class="auth-field">
+      <span>{{ field.label }}</span>
+      {{ field }}
+      {% if field.help_text %}<span class="auth-help">{{ field.help_text|safe }}</span>{% endif %}
+      {% if field.errors %}<span class="auth-err">{{ field.errors|striptags }}</span>{% endif %}
+    </label>
+    {% endfor %}
+    <button class="button primary" type="submit">{% if mode == 'signup' %}Sign up{% else %}Sign in{% endif %}</button>
+  </form>
+
+  <div class="auth-alt">
+    {% if mode == 'signup' %}
+    Already have an account? <a href="{% url 'dashboard-signin' %}">Sign in</a>
+    {% else %}
+    New here? <a href="{% url 'dashboard-signup' %}">Sign up</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+# Atskiros priklausomybės fine-tuning experimentui (HPC GPU node).
+# Lokaliai (Intel Arc, be CUDA) NEDIEGTI.
+torch>=2.4
+transformers>=4.45
+datasets>=3.0
+accelerate>=1.0
+peft>=0.13
+trl>=0.11
+bitsandbytes>=0.44
+sentencepiece>=0.2

@@ -1,0 +1,27 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if model %}Redaguoti modelį{% else %}Naujas modelis{% endif %} · DI testavimo platforma{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Modelių registras</p>
+    <h1>{% if model %}Redaguoti modelį{% else %}Naujas modelis{% endif %}</h1>
+  </div>
+  <a class="button" href="{% url 'dashboard-models' %}">Grįžti</a>
+</header>
+
+<form class="panel form-grid" method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}
+  <label class="field{% if field.name == 'execution_command' or field.name == 'api_config' or field.name == 'extra_config' %} wide{% endif %}">
+    <span>{{ field.label }}</span>
+    {{ field }}
+    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+    {{ field.errors }}
+  </label>
+  {% endfor %}
+  <div class="form-actions">
+    <button class="button primary" type="submit">Išsaugoti modelį</button>
+  </div>
+</form>
+{% endblock %}

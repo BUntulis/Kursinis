@@ -1,0 +1,89 @@
+id: 011_middleware
+title: Custom middleware užklausų laiko matavimui
+difficulty: medium
+category: middleware
+
+description: |
+  Sukurk `tracking` aplikacijos middleware, kuris matuoja užklausos apdorojimo laiką.
+
+  Tikslas:
+    - Kiekvienas sėkmingas atsakas turi turėti aiškų serverio apdorojimo trukmės headerį.
+
+  Failas `tracking/middleware.py`:
+    - Importuok `time` modulį ir naudok `time.perf_counter()`.
+    - Klasė `RequestTimingMiddleware`.
+    - `__init__(self, get_response)` išsaugo `get_response`.
+    - `__call__(self, request)`:
+        * fiksuoja pradžios laiką.
+        * kviečia `get_response(request)`.
+        * apskaičiuoja trukmę milisekundėmis.
+        * į atsakymą prideda headerį `X-Response-Time-Ms`.
+        * Headerio reikšmė yra sveiko skaičiaus stringas.
+        * Grąžina tą patį atsakymą, nekeisdamas statuso ar body.
+    - Jei view kelia exception, middleware neturi jos praryti.
+
+  Failas `tracking/__init__.py`:
+    - Gali būti tuščias.
+
+  Apribojimai:
+    - Nenaudok globalios būsenos laiko saugojimui.
+    - Nekeisk `response.content` ar statuso kodo.
+    - Nepadaryk išorinių tinklo ar failų sistemos operacijų.
+
+expected_files:
+  - tracking/__init__.py
+  - tracking/middleware.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia paprastą, stateless Django middleware, kuris per `time.perf_counter()` apskaičiuoja apdorojimo trukmę, įrašo `X-Response-Time-Ms` headerį ir nekeičia atsakymo semantikos bei exception elgsenos.
+
+unit_test_plan:
+  - Patikrinti headerio buvimą ir sveiko skaičiaus formatą.
+  - Patikrinti deterministinį milisekundžių skaičiavimą su `time.perf_counter` mock'u.
+  - Patikrinti atsakymo statuso ir body passthrough.
+  - Patikrinti, kad exception nėra praryjama.
+  - Patikrinti, kad naudojamas `time.perf_counter`, ne `time.time`.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from unittest.mock import patch
+  from django.http import HttpResponse
+  from django.test import RequestFactory
+  from tracking.middleware import RequestTimingMiddleware
+
+  def test_middleware_adds_integer_header():
+      def view(request):
+          return HttpResponse("ok")
+      response = RequestTimingMiddleware(view)(RequestFactory().get("/"))
+      assert "X-Response-Time-Ms" in response
+      assert response["X-Response-Time-Ms"].isdigit()
+
+  def test_middleware_uses_perf_counter_for_milliseconds():
+      def view(request):
+          return HttpResponse("ok")
+      with patch("tracking.middleware.time.perf_counter", side_effect=[10.0, 10.042]):
+          response = RequestTimingMiddleware(view)(RequestFactory().get("/"))
+      assert response["X-Response-Time-Ms"] == "42"
+
+  def test_response_passthrough_body_and_status():
+      def view(request):
+          return HttpResponse("hello", status=201)
+      response = RequestTimingMiddleware(view)(RequestFactory().get("/"))
+      assert response.status_code == 201
+      assert response.content == b"hello"
+
+  def test_exceptions_are_not_swallowed():
+      def view(request):
+          raise RuntimeError("boom")
+      with pytest.raises(RuntimeError):
+          RequestTimingMiddleware(view)(RequestFactory().get("/"))

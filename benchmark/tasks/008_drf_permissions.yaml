@@ -1,0 +1,136 @@
+id: 008_drf_permissions
+title: DRF ViewSet su autoriaus-tik leidimais
+difficulty: hard
+category: drf
+
+description: |
+  Sukurk `notes` aplikacijos REST API su objektų lygio teisėmis.
+
+  Tikslas:
+    - Autentifikuoti vartotojai gali matyti užrašus, bet keisti arba šalinti gali tik savo užrašus.
+
+  Modelis `Note`:
+    - `title`: `CharField(max_length=200)`.
+    - `body`: `TextField`.
+    - `author`: `ForeignKey(settings.AUTH_USER_MODEL, on_delete=CASCADE, related_name="notes")`.
+    - `__str__` grąžina `title`.
+
+  Permission klasė `IsAuthorOrReadOnly` (`notes/permissions.py`):
+    - Paveldi `BasePermission`.
+    - `SAFE_METHODS` leidžia visiems autentifikuotiems vartotojams.
+    - Ne saugius metodus leidžia tik kai `obj.author == request.user`.
+
+  Serializeris `NoteSerializer`:
+    - `ModelSerializer`, visi laukai.
+    - `author` yra read-only.
+    - `title` negali būti tuščias arba tik tarpai.
+
+  ViewSet `NoteViewSet`:
+    - `ModelViewSet`.
+    - `queryset = Note.objects.all().order_by("id")`.
+    - `permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]`.
+    - `perform_create` kviečia `serializer.save(author=self.request.user)`.
+
+  URL:
+    - `DefaultRouter`, prefix `"notes"`, registruotas `notes/urls.py`.
+
+  Apribojimai:
+    - Neleisk klientui priskirti ar pakeisti `author` per payload.
+    - Nenaudok hardcodintų vartotojų ar rankinių JSON atsakymų.
+    - Grąžink DRF standartinius 401/403/404/400 statusus.
+
+expected_files:
+  - notes/models.py
+  - notes/serializers.py
+  - notes/permissions.py
+  - notes/views.py
+  - notes/urls.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia `Note` modelį, read-only autoriaus serializerį, `IsAuthorOrReadOnly` objektų teises ir `ModelViewSet`, kuriame anonimai atmetami, autentifikuoti vartotojai gali skaityti, o keisti/trinti galima tik savo objektus.
+
+unit_test_plan:
+  - Patikrinti modelio laukus, ryšį ir `__str__`.
+  - Patikrinti anonimo draudimą.
+  - Patikrinti, kad kūrimas priskiria `request.user`, net jei payload turi kitą `author`.
+  - Patikrinti, kad kitas vartotojas gali skaityti, bet negali redaguoti ar trinti.
+  - Patikrinti autoriaus sėkmingą redagavimą ir trynimą.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.contrib.auth import get_user_model
+  from rest_framework.test import APIClient
+  from notes.models import Note
+
+  pytestmark = pytest.mark.django_db
+
+  @pytest.fixture
+  def users():
+      User = get_user_model()
+      alice = User.objects.create_user("alice", password="x")
+      bob = User.objects.create_user("bob", password="x")
+      return alice, bob
+
+  def authed(user):
+      client = APIClient()
+      client.force_authenticate(user)
+      return client
+
+  def test_model_contract(users):
+      alice, _ = users
+      note = Note.objects.create(title="T", body="B", author=alice)
+      assert Note._meta.get_field("title").max_length == 200
+      assert Note._meta.get_field("author").remote_field.related_name == "notes"
+      assert str(note) == "T"
+
+  def test_anonymous_cannot_list_or_create():
+      client = APIClient()
+      assert client.get("/notes/").status_code in (401, 403)
+      assert client.post("/notes/", {"title": "T", "body": "B"}, format="json").status_code in (401, 403)
+
+  def test_create_assigns_authenticated_user_and_ignores_payload_author(users):
+      alice, bob = users
+      response = authed(alice).post("/notes/", {"title": "T", "body": "B", "author": bob.id}, format="json")
+      assert response.status_code == 201, response.content
+      note = Note.objects.get()
+      assert note.author == alice
+
+  def test_authenticated_users_can_read_others_notes(users):
+      alice, bob = users
+      note = Note.objects.create(title="Shared", body="B", author=alice)
+      response = authed(bob).get(f"/notes/{note.pk}/")
+      assert response.status_code == 200
+      assert response.json()["title"] == "Shared"
+
+  def test_other_user_cannot_edit_or_delete(users):
+      alice, bob = users
+      note = Note.objects.create(title="T", body="B", author=alice)
+      client = authed(bob)
+      patch = client.patch(f"/notes/{note.pk}/", {"title": "Z"}, format="json")
+      delete = client.delete(f"/notes/{note.pk}/")
+      assert patch.status_code == 403
+      assert delete.status_code == 403
+      note.refresh_from_db()
+      assert note.title == "T"
+
+  def test_author_can_update_and_delete(users):
+      alice, _ = users
+      note = Note.objects.create(title="T", body="B", author=alice)
+      client = authed(alice)
+      patch = client.patch(f"/notes/{note.pk}/", {"title": "Z"}, format="json")
+      assert patch.status_code == 200
+      note.refresh_from_db()
+      assert note.title == "Z"
+      delete = client.delete(f"/notes/{note.pk}/")
+      assert delete.status_code == 204
+      assert Note.objects.count() == 0

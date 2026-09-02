@@ -1,0 +1,51 @@
+{% comment %}
+Composer menus shared by the chat + home composers.
+Params (via {% include with %}): mode, models, cur_model, cur_effort, cur_thinking, cur_planning, cur_pursue.
+Wired by composer-menus.js (ComposerMenus.init). The + / buttons live in the composer toolbar
+(.cm-add-btn / .cm-actions-btn); these are the floating panels they open.
+{% endcomment %}
+
+{# + menu : Upload from computer · Add context #}
+<div class="cm-pop cm-add" data-cm="add" hidden>
+  <button type="button" class="cm-item" data-action="upload" {% if mode != 'chat' %}disabled title="Available once the project exists"{% endif %}>↑ Upload from computer</button>
+  <button type="button" class="cm-item" data-action="mention" {% if mode != 'chat' %}disabled title="Available once the project has files"{% endif %}>▤ Add context</button>
+</div>
+
+{# / palette : filterable actions (Context + Model) #}
+<div class="cm-pop cm-palette" data-cm="palette" hidden>
+  <div data-cm-view="main">
+    <input type="text" class="cm-filter" placeholder="Filter actions…" data-cm-filter aria-label="Filter actions">
+    <div class="cm-scroll">
+      {% if mode == 'chat' %}
+      <div class="cm-section">Context</div>
+      <button type="button" class="cm-item" data-action="upload" data-label="attach file">Attach file…</button>
+      <button type="button" class="cm-item" data-action="mention" data-label="mention file from this project">Mention file from this project…</button>
+      <button type="button" class="cm-item" data-action="clear" data-label="clear conversation">Clear conversation</button>
+      <button type="button" class="cm-item" data-label="rewind" disabled title="Not available in this app">Rewind</button>
+      {% endif %}
+      <div class="cm-section">Model</div>
+      <button type="button" class="cm-item" data-action="switch-model" data-label="switch model">Switch model… <span class="cm-val" data-cm-val="model"></span></button>
+      <button type="button" class="cm-item" data-action="effort" data-label="effort">Effort <span class="cm-val" data-cm-val="effort"></span></button>
+      <button type="button" class="cm-item" data-action="thinking" data-label="thinking">Thinking <span class="cm-switch" data-cm-val="thinking"></span></button>
+      <button type="button" class="cm-item" data-action="planning" data-label="planning mode">Planning mode <span class="cm-switch" data-cm-val="planning"></span></button>
+      <button type="button" class="cm-item" data-action="pursue" data-label="pursue goal">Pursue goal <span class="cm-switch" data-cm-val="pursue"></span></button>
+      <button type="button" class="cm-item" data-action="auto" data-label="auto mode approve commands automatically" title="Run the agent's commands without asking for approval">Auto mode <span class="cm-switch" data-cm-val="auto"></span></button>
+      <button type="button" class="cm-item" data-label="account usage" disabled title="Not available in this app">Account &amp; usage…</button>
+      <button type="button" class="cm-item" data-label="toggle fast mode" disabled title="Not available in this app">Toggle fast mode</button>
+    </div>
+  </div>
+  <div data-cm-view="sub" hidden>
+    <button type="button" class="cm-back" data-cm-back>‹ Back</button>
+    <div class="cm-sub-title" data-cm-sub-title></div>
+    <div class="cm-scroll" data-cm-sub-list></div>
+  </div>
+</div>
+
+{# server-rendered model list consumed by the 'Switch model' sub-view #}
+<div class="cm-data" data-cm-models hidden>
+  <span data-value="">Auto (default)</span>
+  {% for m in models %}<span data-value="{{ m.id }}">{{ m.name }}</span>{% endfor %}
+</div>
+
+<input type="file" data-cm-file hidden>
+<span data-cm-seed data-model="{{ cur_model|default:'' }}" data-effort="{{ cur_effort|default:'medium' }}" data-thinking="{% if cur_thinking %}1{% else %}0{% endif %}" data-planning="{% if cur_planning %}1{% else %}0{% endif %}" data-pursue="{% if cur_pursue %}1{% else %}0{% endif %}" data-auto="{% if cur_auto %}1{% else %}0{% endif %}" hidden></span>

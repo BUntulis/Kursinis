@@ -1,0 +1,113 @@
+id: 009_query_optimization
+title: select_related / prefetch_related užklausų optimizavimas
+difficulty: hard
+category: orm
+
+description: |
+  Sukurk `shop` aplikaciją su optimizuota produktų užklausa.
+
+  Tikslas:
+    - Produktų sąrašas turi efektyviai užkrauti kategorijas ir tagus be N+1 problemos.
+
+  Modeliai:
+    - `Category`:
+        * `name`: `CharField(max_length=100)`.
+        * `__str__` grąžina `name`.
+    - `Tag`:
+        * `name`: `CharField(max_length=50)`.
+        * `__str__` grąžina `name`.
+    - `Product`:
+        * `name`: `CharField(max_length=200)`.
+        * `category`: `ForeignKey(Category, on_delete=CASCADE, related_name="products")`.
+        * `price`: `DecimalField(max_digits=10, decimal_places=2)`.
+        * `tags`: `ManyToManyField(Tag, related_name="products", blank=True)`.
+        * `__str__` grąžina `name`.
+
+  Funkcija `get_products_efficiently()` faile `shop/queries.py`:
+    - Grąžina neįvertintą `QuerySet`, ne `list`.
+    - Naudoja `select_related("category")`.
+    - Naudoja `prefetch_related("tags")`.
+    - Rikiuoja pagal `price` didėjančiai, tada pagal `id`.
+    - Neturi atlikti papildomų užklausų funkcijos kvietimo metu.
+
+  Apribojimai:
+    - Nenaudok raw SQL.
+    - Nenaudok hardcodintų produktų.
+    - Neįvertink QuerySet funkcijoje (`list(...)`, ciklai ar pan.).
+
+expected_files:
+  - shop/models.py
+  - shop/queries.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas turi tris susietus ORM modelius ir funkciją, kuri grąžina tingų, toliau filtruojamą QuerySet su `select_related`, `prefetch_related` ir deterministiniu rikiavimu, todėl kategorijų bei tagų skaitymas nesukelia N+1 užklausų.
+
+unit_test_plan:
+  - Patikrinti modelių laukus, ryšius ir `__str__`.
+  - Patikrinti, kad funkcija grąžina QuerySet, o ne sąrašą.
+  - Patikrinti kainos ir ID rikiavimą.
+  - Patikrinti, kad category ir tags pasiekiami su ribotu užklausų skaičiumi.
+  - Patikrinti, kad QuerySet išlieka komponuojamas su papildomu `filter`.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from decimal import Decimal
+  from django.db import connection
+  from django.db.models import QuerySet
+  from django.test.utils import CaptureQueriesContext
+  from shop.models import Category, Product, Tag
+  from shop.queries import get_products_efficiently
+
+  pytestmark = pytest.mark.django_db
+
+  @pytest.fixture
+  def data():
+      category = Category.objects.create(name="Food")
+      other = Category.objects.create(name="Tools")
+      tag_a = Tag.objects.create(name="organic")
+      tag_b = Tag.objects.create(name="local")
+      for index, price in enumerate(["2.00", "1.00", "3.00", "1.00"]):
+          product = Product.objects.create(name=f"P{index}", category=category if index < 3 else other, price=Decimal(price))
+          product.tags.set([tag_a, tag_b])
+      return category, other
+
+  def test_model_contract(data):
+      category, _ = data
+      product = Product.objects.filter(category=category).first()
+      assert Category._meta.get_field("name").max_length == 100
+      assert Tag._meta.get_field("name").max_length == 50
+      assert Product._meta.get_field("category").remote_field.related_name == "products"
+      assert Product._meta.get_field("tags").blank is True
+      assert str(product) == product.name
+
+  def test_returns_lazy_queryset(data):
+      qs = get_products_efficiently()
+      assert isinstance(qs, QuerySet)
+      assert qs.filter(name="P0").count() == 1
+
+  def test_ordered_by_price_then_id(data):
+      products = list(get_products_efficiently())
+      keys = [(product.price, product.id) for product in products]
+      assert keys == sorted(keys)
+
+  def test_no_n_plus_one_for_category_and_tags(data):
+      with CaptureQueriesContext(connection) as ctx:
+          for product in get_products_efficiently():
+              _ = product.category.name
+              _ = [tag.name for tag in product.tags.all()]
+      assert len(ctx.captured_queries) <= 3, ctx.captured_queries
+
+  def test_queryset_remains_composable(data):
+      category, _ = data
+      names = list(get_products_efficiently().filter(category=category).values_list("name", flat=True))
+      assert names == ["P1", "P0", "P2"]

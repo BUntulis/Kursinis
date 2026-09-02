@@ -1,0 +1,56 @@
+{% extends "dashboard/base.html" %}
+{% load kursinis_assets %}
+{% block title %}Models · AI testing platform{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Model library</p>
+    <h1>Models</h1>
+  </div>
+</header>
+
+<section class="panel models-panel" id="models-page"
+         data-library-url="{% url 'dashboard-ollama-library' %}"
+         data-page-url-template="{% url 'dashboard-ollama-model-page' '__NAME__' %}"
+         data-installed-url="{% url 'dashboard-ollama-installed' %}"
+         data-remove-url="{% url 'dashboard-ollama-remove' %}">
+  {% csrf_token %}
+
+  <div class="mtab-bar" role="tablist" aria-label="Model lists">
+    <button type="button" class="mtab active" data-mtab="available" role="tab"
+            id="mtab-available" aria-controls="mpane-available" aria-selected="true">Available</button>
+    <button type="button" class="mtab" data-mtab="installed" role="tab" tabindex="-1"
+            id="mtab-installed" aria-controls="mpane-installed" aria-selected="false">Installed</button>
+  </div>
+
+  {# -------- Available: the public ollama.com library (scraped + cached) -------- #}
+  <div class="mtab-pane" data-mpane="available" id="mpane-available" role="tabpanel" aria-labelledby="mtab-available">
+    <div class="mlib-toolbar">
+      <input type="text" id="mlib-search" class="mlib-search" placeholder="Search models…" aria-label="Search models">
+      <button type="button" class="ghost-btn small" id="mlib-refresh">Refresh list</button>
+      <span class="mlib-status" id="mlib-status">Loading the model library…</span>
+    </div>
+    <div class="mlib-grid" id="mlib-grid"></div>
+    <div class="mpager" id="mlib-pager" hidden></div>
+  </div>
+
+  {# -------- Installed: local ollama models -------- #}
+  <div class="mtab-pane" data-mpane="installed" id="mpane-installed" role="tabpanel" aria-labelledby="mtab-installed" hidden>
+    <div class="minst-pulls" id="minst-pulls" aria-live="polite"></div>
+    <div class="mlib-status" id="minst-status" role="status" aria-live="polite"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Model</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+        <tbody id="minst-body">
+          <tr><td colspan="4" class="empty">Loading installed models…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mpager" id="minst-pager" hidden></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static_v 'dashboard/models.js' %}"></script>
+{% endblock %}

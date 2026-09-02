@@ -1,0 +1,115 @@
+id: 006_management_command
+title: Django management command duomenų importavimui
+difficulty: medium
+category: commands
+
+description: |
+  Sukurk `inventory` aplikaciją su produktų importavimo komanda.
+
+  Tikslas:
+    - Sandėlio komanda turi galėti saugiai importuoti produktus iš CSV ir atnaujinti esamus įrašus pagal SKU.
+
+  Modelis `Product`:
+    - `sku`: `CharField(max_length=32, unique=True)`.
+    - `name`: `CharField(max_length=200)`.
+    - `price`: `DecimalField(max_digits=10, decimal_places=2)`.
+    - `stock`: `IntegerField(default=0)`.
+    - `__str__` grąžina `sku`.
+
+  Management command `import_products`:
+    - Failas: `inventory/management/commands/import_products.py`.
+    - Priima positional argumentą `csv_path`.
+    - CSV antraštė turi būti tiksliai: `sku,name,price,stock`.
+    - Naudoja `csv.DictReader`.
+    - Kiekvienai eilutei validuoja:
+        * `sku` ir `name` netušti.
+        * `price` yra `Decimal` ir nėra neigiamas.
+        * `stock` yra sveikasis skaičius ir nėra neigiamas.
+    - Naudoja `transaction.atomic()`, kad klaida nepaliktų dalinio importo.
+    - Naudoja `Product.objects.update_or_create(sku=..., defaults=...)`.
+    - Pabaigoje į stdout rašo tiksliai: `Imported X, updated Y`.
+    - Netinkamam failui, antraštei ar eilutei kelia `CommandError`.
+
+  Apribojimai:
+    - Nenaudok pandas ar išorinių priklausomybių.
+    - Neignoruok klaidingų eilučių tyliai.
+    - Nenaudok float kainoms saugoti.
+
+expected_files:
+  - inventory/models.py
+  - inventory/management/__init__.py
+  - inventory/management/commands/__init__.py
+  - inventory/management/commands/import_products.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia `Product` modelį ir patikimą Django management command, kuri skaito CSV, validuoja antraštes ir eilučių reikšmes, importuoja arba atnaujina produktus per `update_or_create`, skaičiuoja sukurtus ir atnaujintus įrašus bei naudoja `CommandError` ir `transaction.atomic()`.
+
+unit_test_plan:
+  - Patikrinti modelio laukus, unikalų SKU ir `__str__`.
+  - Patikrinti naujų produktų importą ir stdout santrauką.
+  - Patikrinti esamų produktų atnaujinimą.
+  - Patikrinti netinkamą antraštę, neigiamas reikšmes ir trūkstamą failą.
+  - Patikrinti, kad klaidos atveju neįvyksta dalinis importas.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from decimal import Decimal
+  from io import StringIO
+  from django.core.management import call_command
+  from django.core.management.base import CommandError
+  from inventory.models import Product
+
+  pytestmark = pytest.mark.django_db
+
+  def test_model_contract():
+      assert Product._meta.get_field("sku").max_length == 32
+      assert Product._meta.get_field("sku").unique is True
+      assert Product._meta.get_field("price").decimal_places == 2
+      assert str(Product(sku="A1", name="Apple", price=Decimal("1.50"), stock=10)) == "A1"
+
+  def test_import_creates_products(tmp_path):
+      csv_file = tmp_path / "products.csv"
+      csv_file.write_text("sku,name,price,stock\nA1,Apple,1.50,10\nB2,Banana,0.75,20\n", encoding="utf-8")
+      out = StringIO()
+      call_command("import_products", str(csv_file), stdout=out)
+      assert Product.objects.count() == 2
+      assert Product.objects.get(sku="A1").price == Decimal("1.50")
+      assert "Imported 2, updated 0" in out.getvalue()
+
+  def test_import_updates_existing(tmp_path):
+      Product.objects.create(sku="A1", name="Old", price=Decimal("1.00"), stock=5)
+      csv_file = tmp_path / "products.csv"
+      csv_file.write_text("sku,name,price,stock\nA1,New,2.00,99\n", encoding="utf-8")
+      out = StringIO()
+      call_command("import_products", str(csv_file), stdout=out)
+      product = Product.objects.get(sku="A1")
+      assert product.name == "New"
+      assert product.stock == 99
+      assert "Imported 0, updated 1" in out.getvalue()
+
+  def test_invalid_header_raises_command_error(tmp_path):
+      csv_file = tmp_path / "bad.csv"
+      csv_file.write_text("sku,name,price\nA1,Apple,1.50\n", encoding="utf-8")
+      with pytest.raises(CommandError):
+          call_command("import_products", str(csv_file), stdout=StringIO())
+
+  def test_invalid_row_rolls_back_import(tmp_path):
+      csv_file = tmp_path / "bad-row.csv"
+      csv_file.write_text("sku,name,price,stock\nA1,Apple,1.50,10\nB2,Banana,0.75,-1\n", encoding="utf-8")
+      with pytest.raises(CommandError):
+          call_command("import_products", str(csv_file), stdout=StringIO())
+      assert Product.objects.count() == 0
+
+  def test_missing_file_raises_command_error(tmp_path):
+      with pytest.raises(CommandError):
+          call_command("import_products", str(tmp_path / "missing.csv"), stdout=StringIO())

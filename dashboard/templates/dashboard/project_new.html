@@ -1,0 +1,41 @@
+{% extends "dashboard/base.html" %}
+{% block title %}New project · DI testavimo platforma{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;">
+  <div class="eyebrow">NEW PROJECT</div>
+  <h1 style="margin:4px 0 18px;font-weight:300;">Start a project chat</h1>
+
+  {% if error %}<div class="panel" style="padding:12px 16px;margin-bottom:14px;color:#ff9d96;">{{ error }}</div>{% endif %}
+
+  <form method="post" action="{% url 'dashboard-project-new' %}" class="pform">
+    {% csrf_token %}
+
+    <div class="pform-field">
+      <label>Project name <span class="pform-hint">(optional — the model will name it)</span></label>
+      <input type="text" name="name" placeholder="Leave blank to auto-name">
+    </div>
+
+    <div class="pform-field">
+      <label>What do you want to build or change?</label>
+      <textarea name="prompt" rows="5" required placeholder="e.g. Build a blog with posts, comments, and an admin…">{{ initial_prompt }}</textarea>
+    </div>
+
+    {# Model/effort/thinking are fixed to sensible defaults; the agent auto-picks the installed coder model. #}
+    <input type="hidden" name="thinking" value="on">
+    <input type="hidden" name="pursue_goal" value="on">
+
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button class="button primary" type="submit">Create &amp; start ▶</button>
+      <a class="button" href="{% url 'dashboard-projects' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<style>
+  .pform { display:flex; flex-direction:column; gap:16px; }
+  .pform-field { display:flex; flex-direction:column; gap:6px; }
+  .pform-field > label { color:var(--text-muted); font-size:13px; }
+  .pform-hint { color:#666; font-size:11px; }
+  .pform-field input[type=text], .pform-field textarea, .pform-field select { padding:9px 12px; font-size:14px; }
+</style>
+{% endblock %}

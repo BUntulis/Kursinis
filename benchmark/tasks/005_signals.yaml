@@ -1,0 +1,92 @@
+id: 005_signals
+title: Django signal po User sukūrimo sukuriantis Profile
+difficulty: medium
+category: signals
+
+description: |
+  Sukurk aplikaciją `profiles`, kuri automatiškai sukuria vartotojo profilį.
+
+  Tikslas:
+    - Kiekvienas naujai sukurtas vartotojas turi turėti tiksliai vieną `Profile`.
+
+  Modelis `Profile`:
+    - `user`: `OneToOneField(settings.AUTH_USER_MODEL, on_delete=CASCADE, related_name="profile")`.
+    - `bio`: `TextField(blank=True)`.
+    - `avatar_url`: `URLField(blank=True)`.
+    - `__str__` grąžina vartotojo identifikatorių arba el. paštą, jei toks yra.
+
+  Signalai:
+    - Faile `profiles/signals.py` naudok `post_save` signalą.
+    - Kai vartotojas sukuriamas (`created=True`), automatiškai sukurk tuščią `Profile`.
+    - Signalas neturi kurti antro profilio, kai vartotojas tik atnaujinamas.
+
+  App config:
+    - Faile `profiles/apps.py` sukurk `ProfilesConfig`.
+    - `ProfilesConfig.ready()` importuoja `profiles.signals`.
+
+  Apribojimai:
+    - Nenaudok signalų importo modelio failo apačioje kaip vienintelio pajungimo būdo.
+    - Nenaudok hardcodintų vartotojų.
+    - Ryšys turi veikti su custom `AUTH_USER_MODEL`.
+
+expected_files:
+  - profiles/models.py
+  - profiles/signals.py
+  - profiles/apps.py
+
+expected_implementation_summary: |
+  Teisingas sprendimas turi `Profile` modelį su one-to-one ryšiu į aktyvų vartotojo modelį, `post_save` signalą, kuris kuria profilį tik naujam vartotojui, ir `AppConfig.ready()` pajungimą, todėl signalas veikia sandbox bei realiame projekte.
+
+unit_test_plan:
+  - Patikrinti `Profile` laukus, `related_name`, `blank` ir `__str__`.
+  - Patikrinti, kad naujas vartotojas automatiškai gauna profilį.
+  - Patikrinti, kad vartotojo atnaujinimas nekuria dublikato.
+  - Patikrinti one-to-one unikalumą ir vartotojo trynimo kaskadą.
+  - Patikrinti, kad signalai importuojami per app config.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.contrib.auth import get_user_model
+  from django.db import IntegrityError
+  from profiles.models import Profile
+
+  pytestmark = pytest.mark.django_db
+
+  def test_profile_model_contract():
+      field = Profile._meta.get_field("user")
+      assert field.remote_field.related_name == "profile"
+      assert Profile._meta.get_field("bio").blank is True
+      assert Profile._meta.get_field("avatar_url").blank is True
+
+  def test_profile_auto_created():
+      user = get_user_model().objects.create_user("alice", password="x")
+      assert Profile.objects.filter(user=user).exists()
+      assert user.profile.bio == ""
+      assert user.profile.avatar_url == ""
+
+  def test_user_update_does_not_create_duplicate_profile():
+      user = get_user_model().objects.create_user("bob", password="x")
+      user.first_name = "Bob"
+      user.save()
+      assert Profile.objects.filter(user=user).count() == 1
+
+  def test_profile_one_to_one_is_enforced():
+      user = get_user_model().objects.create_user("carol", password="x")
+      with pytest.raises(IntegrityError):
+          Profile.objects.create(user=user)
+
+  def test_user_delete_cascades_profile():
+      user = get_user_model().objects.create_user("dan", password="x")
+      profile_id = user.profile.id
+      user.delete()
+      assert not Profile.objects.filter(id=profile_id).exists()

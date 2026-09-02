@@ -1,0 +1,16 @@
+{
+  "name": "kursinis-ai-benchmark-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./dashboard/static/dashboard/tailwind-input.css -o ./dashboard/static/dashboard/tailwind.css --minify",
+    "build:js": "node ./scripts/copy-chart.js",
+    "build": "npm run build:css && npm run build:js"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.9"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

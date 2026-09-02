@@ -1,0 +1,353 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{{ project.name }} · DI testavimo platforma{% endblock %}
+{% block content %}
+<div class="pd">
+  <a class="pd-back" href="{% url 'dashboard-projects' %}">‹ Projects</a>
+
+  <div class="pd-head">
+    <div class="pd-head-main">
+      <div class="eyebrow">PROJECT</div>
+      <h1 class="pd-title">{{ project.name }}</h1>
+      <div class="pd-meta">
+        Created {{ project.created_at|timesince }} ago · updated {{ project.updated_at|timesince }} ago
+      </div>
+    </div>
+    <div class="pd-head-actions">
+      <form method="post" action="{% url 'dashboard-project-new-chat' project.id %}">{% csrf_token %}<button class="button primary" type="submit">New chat ▶</button></form>
+      <form method="post" action="{% url 'dashboard-project-delete' project.id %}"
+            onsubmit="return confirm('Delete this project and its sandbox permanently?');">
+        {% csrf_token %}
+        <button class="button pd-del" type="submit">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="pd-stats">
+    <div class="pd-stat"><span class="pd-stat-num">{{ stats.chats }}</span><span class="pd-stat-lbl">Chat{{ stats.chats|pluralize }}</span></div>
+    <div class="pd-stat"><span class="pd-stat-num">{{ stats.turns }}</span><span class="pd-stat-lbl">Turn{{ stats.turns|pluralize }}</span></div>
+    <div class="pd-stat"><span class="pd-stat-num">{{ stats.files }}</span><span class="pd-stat-lbl">File{{ stats.files|pluralize }}</span></div>
+    <div class="pd-stat"><span class="pd-stat-num">{{ stats.size_human }}</span><span class="pd-stat-lbl">Sandbox size</span></div>
+    <div class="pd-stat"><span class="pd-stat-num">{{ stats.tokens }}</span><span class="pd-stat-lbl">Tokens</span></div>
+    <div class="pd-stat">
+      <span class="pd-stat-num pd-prev {% if preview and preview.status == 'running' %}is-running{% elif preview and preview.status == 'failed' %}is-failed{% endif %}">
+        {% if preview and preview.status == 'running' %}Running{% elif preview and preview.status == 'failed' %}Failed{% else %}Off{% endif %}
+      </span>
+      <span class="pd-stat-lbl">Preview</span>
+    </div>
+  </div>
+
+  <div class="pd-tabs" role="tablist" aria-label="Project sections">
+    <button class="pd-tab active" role="tab" id="tab-chats" aria-controls="panel-chats" aria-selected="true" data-tab="chats">Chats</button>
+    <button class="pd-tab" role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false" tabindex="-1" data-tab="files">Files</button>
+    <button class="pd-tab" role="tab" id="tab-databases" aria-controls="panel-databases" aria-selected="false" tabindex="-1" data-tab="databases">Databases</button>
+    <button class="pd-tab" role="tab" id="tab-workflows" aria-controls="panel-workflows" aria-selected="false" tabindex="-1" data-tab="workflows">Workflows</button>
+    <button class="pd-tab" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1" data-tab="settings">Settings</button>
+  </div>
+
+  {# ---- Chats ---- #}
+  <section class="pd-panel" id="panel-chats" role="tabpanel" aria-labelledby="tab-chats" tabindex="0">
+    {% if chats %}
+    <div class="pd-chat-list">
+      {% for c in chats %}
+      <a class="pd-chat" href="{% url 'dashboard-project-chat' c.obj.id %}">
+        <span class="pd-chat-dot pd-dot-{{ c.state }}" aria-hidden="true"></span>
+        <span class="pd-chat-body">
+          <span class="pd-chat-title">
+            {{ c.obj.title|default:"Untitled chat" }}
+            {% if c.is_prompt_writer %}<span class="pd-tag">Prompt writer</span>{% endif %}
+          </span>
+          {% if c.last_prompt %}<span class="pd-chat-sub">{{ c.last_prompt|truncatechars:120 }}</span>{% endif %}
+          <span class="pd-chat-meta">{{ c.turns }} turn{{ c.turns|pluralize }} · {{ c.tokens }} tokens · {{ c.obj.updated_at|timesince }} ago</span>
+        </span>
+        <span class="pd-chat-go" aria-hidden="true">›</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="pd-empty">
+      <div class="pd-empty-title">No chats yet</div>
+      <div class="pd-empty-sub">Start a chat to have the agent build or change this project.</div>
+      <form method="post" action="{% url 'dashboard-project-new-chat' project.id %}">{% csrf_token %}<button class="button primary" type="submit">New chat ▶</button></form>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---- Files ---- #}
+  <section class="pd-panel" id="panel-files" role="tabpanel" aria-labelledby="tab-files" tabindex="0" hidden>
+    {% if files %}
+    <div class="pd-file-list">
+      {% for f in files %}
+      <div class="pd-file">
+        <span class="pd-file-path" title="{{ f.path }}">{{ f.path }}</span>
+        <span class="pd-file-size">{{ f.size_human }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% if files_truncated %}<div class="pd-file-more">+{{ files_truncated }} more file{{ files_truncated|pluralize }}</div>{% endif %}
+    {% else %}
+    <div class="pd-empty">
+      <div class="pd-empty-title">The sandbox is empty</div>
+      <div class="pd-empty-sub">Files appear here as the agent writes them in a chat.</div>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---- Databases (loaded lazily; only when a db.sqlite3 already exists in the sandbox) ---- #}
+  <section class="pd-panel" id="panel-databases" role="tabpanel" aria-labelledby="tab-databases" tabindex="0" hidden>
+    {% if database_url %}
+    <div class="pd-db" data-db-url="{{ database_url }}">
+      <div class="pd-db-loading">Loading database…</div>
+    </div>
+    {% else %}
+    <div class="pd-empty">
+      <div class="pd-empty-title">No database yet</div>
+      <div class="pd-empty-sub">A SQLite database appears here once the agent runs the Django project in a chat.</div>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---- Workflows: project-wide build-run history ---- #}
+  <section class="pd-panel" id="panel-workflows" role="tabpanel" aria-labelledby="tab-workflows" tabindex="0" hidden>
+    {% if runs %}
+    <div class="pd-wf-list">
+      {% for w in runs %}
+      <a class="pd-wf" href="{% url 'dashboard-project-chat' w.chat.id %}">
+        <span class="pd-chat-dot pd-dot-{{ w.state }}" aria-hidden="true"></span>
+        <span class="pd-wf-body">
+          <span class="pd-wf-prompt">{{ w.prompt|default:"(no prompt)"|truncatechars:110 }}</span>
+          <span class="pd-wf-meta">
+            {{ w.chat.title|default:"Untitled chat" }} · {{ w.model }} ·
+            {{ w.duration_h }} · {{ w.tokens }} tokens · {{ w.created_at|timesince }} ago
+          </span>
+        </span>
+        <span class="pd-wf-status pd-wf-{{ w.state }}">{{ w.status }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="pd-empty">
+      <div class="pd-empty-title">No runs yet</div>
+      <div class="pd-empty-sub">Every agent turn you start in a chat shows up here as a build run.</div>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ---- Settings ---- #}
+  <section class="pd-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" tabindex="0" hidden>
+    <form class="pd-set" method="post" action="{% url 'dashboard-project-update' project.id %}">
+      {% csrf_token %}
+      <div class="pd-set-field">
+        <label for="pd-name">Project name</label>
+        <input type="text" id="pd-name" name="name" value="{{ project.name }}" maxlength="180" required>
+      </div>
+      <div class="pd-set-actions">
+        <button class="button primary" type="submit">Save changes</button>
+      </div>
+    </form>
+
+    <div class="pd-set-info">
+      <div class="pd-set-info-row"><span class="pd-set-info-k">Slug</span><span class="pd-set-info-v">{{ project.slug }}</span></div>
+      <div class="pd-set-info-row"><span class="pd-set-info-k">Sandbox</span><span class="pd-set-info-v">{{ project.sandbox_path|default:"—" }}</span></div>
+      <div class="pd-set-info-row"><span class="pd-set-info-k">Created</span><span class="pd-set-info-v">{{ project.created_at|date:"Y-m-d H:i" }}</span></div>
+      <div class="pd-set-info-row"><span class="pd-set-info-k">Updated</span><span class="pd-set-info-v">{{ project.updated_at|date:"Y-m-d H:i" }}</span></div>
+    </div>
+
+    <div class="pd-danger">
+      <div class="pd-danger-text">
+        <div class="pd-danger-title">Delete this project</div>
+        <div class="pd-danger-sub">Removes the project, all its chats, and its sandbox directory. This cannot be undone.</div>
+      </div>
+      <form method="post" action="{% url 'dashboard-project-delete' project.id %}"
+            onsubmit="return confirm('Delete this project and its sandbox permanently?');">
+        {% csrf_token %}
+        <button class="button pd-del" type="submit">Delete project</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<style>
+  .pd { max-width: 1040px; margin: 0 auto; }
+  .pd-back { color: var(--text-muted); font-size: 13px; text-decoration: none; }
+  .pd-back:hover { color: var(--text); }
+
+  .pd-head { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; margin: 10px 0 22px; }
+  .pd-title { font-weight: 300; margin: 4px 0 6px; }
+  .pd-meta { color: var(--text-muted); font-size: 13px; }
+  .pd-head-actions { align-items: center; display: flex; flex: none; gap: 10px; }
+  .pd-head-actions form { margin: 0; }
+  .pd-del { color: #ff9d96; }
+  .pd-del:hover { border-color: #ff9d96; }
+
+  .pd-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-bottom: 22px; }
+  .pd-stat {
+    align-items: flex-start; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;
+  }
+  .pd-stat-num { color: var(--text); font-size: 22px; font-weight: 500; line-height: 1.1; }
+  .pd-stat-lbl { color: var(--text-muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .pd-prev { font-size: 16px; }
+  .pd-prev.is-running { color: var(--pass, #3fb950); }
+  .pd-prev.is-failed { color: var(--fail, #f85149); }
+
+  /* ---- Tabs ---- */
+  .pd-tabs { border-bottom: 1px solid var(--border); display: flex; gap: 4px; margin-bottom: 18px; }
+  .pd-tab {
+    background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted);
+    cursor: pointer; font-size: 13.5px; font-weight: 500; margin-bottom: -1px; padding: 9px 14px;
+  }
+  .pd-tabs .pd-tab:hover { background: none; color: var(--text); }
+  .pd-tab.active { border-bottom-color: var(--accent); color: var(--text); }
+  .pd-panel { animation: pd-fade 0.2s ease; }
+  .pd-panel[hidden] { display: none; }
+  @keyframes pd-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---- Chats ---- */
+  .pd-chat-list, .pd-wf-list { display: flex; flex-direction: column; gap: 8px; }
+  .pd-chat, .pd-wf {
+    align-items: center; border: 1px solid var(--border); border-radius: 9px; color: inherit;
+    display: flex; gap: 12px; padding: 12px 14px; text-decoration: none; transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .pd-chat:hover, .pd-wf:hover { background: rgba(255, 255, 255, 0.02); border-color: var(--accent); }
+  .pd-chat-dot { border-radius: 50%; flex: none; height: 9px; margin-top: 2px; width: 9px; }
+  .pd-dot-working { animation: pd-pulse 1.4s ease-in-out infinite; background: var(--running, #d29922); }
+  .pd-dot-failed { background: var(--fail, #f85149); }
+  .pd-dot-idle { background: #3f3f3f; }
+  .pd-chat-body { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+  .pd-chat-title { align-items: center; color: var(--text); display: flex; font-size: 14px; font-weight: 500; gap: 8px; }
+  .pd-tag { background: rgba(56,189,248,0.12); border-radius: 5px; color: var(--accent); font-size: 10px; font-weight: 600; padding: 1px 7px; text-transform: uppercase; }
+  .pd-chat-sub { color: var(--text-muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-chat-meta { color: #6f6f6f; font-size: 11.5px; }
+  .pd-chat-go { color: #555; flex: none; font-size: 20px; }
+  .pd-chat:hover .pd-chat-go { color: var(--accent); }
+
+  /* ---- Files ---- */
+  .pd-file-list { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; padding: 4px 14px; }
+  .pd-file { align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; gap: 10px; justify-content: space-between; padding: 8px 0; }
+  .pd-file:last-child { border-bottom: 0; }
+  .pd-file-path { color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-file-size { color: var(--text-muted); flex: none; font-size: 11.5px; }
+  .pd-file-more { color: var(--text-muted); font-size: 12px; margin-top: 10px; }
+
+  /* ---- Databases ---- */
+  .pd-db-loading, .pd-db-empty { color: var(--text-muted); font-size: 13px; padding: 16px 2px; }
+  .pd-db-table { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .pd-db-table-head { align-items: center; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border); display: flex; gap: 10px; justify-content: space-between; padding: 10px 14px; }
+  .pd-db-table-name { color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; font-weight: 600; }
+  .pd-db-table-count { color: var(--text-muted); font-size: 12px; }
+  .pd-db-cols { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; }
+  .pd-db-col { background: #1b1b1b; border: 1px solid #2a2a2a; border-radius: 6px; color: #cfcfcf; font-family: "Cascadia Code", Consolas, monospace; font-size: 11.5px; padding: 3px 8px; }
+  .pd-db-col-pk { border-color: rgba(56,189,248,0.4); color: var(--accent); }
+  .pd-db-col-type { color: #777; }
+
+  /* ---- Workflows ---- */
+  .pd-wf-body { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+  .pd-wf-prompt { color: var(--text); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-wf-meta { color: #6f6f6f; font-size: 11.5px; }
+  .pd-wf-status { border-radius: 999px; flex: none; font-size: 11px; padding: 2px 10px; text-transform: capitalize; }
+  .pd-wf-idle { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+  .pd-wf-working { background: rgba(210,153,34,0.15); color: var(--running, #d29922); }
+  .pd-wf-failed { background: rgba(248,81,73,0.15); color: var(--fail, #f85149); }
+
+  /* ---- Settings ---- */
+  .pd-set { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .pd-set-field { display: flex; flex-direction: column; gap: 6px; max-width: 460px; }
+  .pd-set-field label { color: var(--text-muted); font-size: 13px; }
+  .pd-set-field input { font-size: 14px; padding: 9px 12px; }
+  .pd-set-actions { margin-top: 14px; }
+  .pd-set-info { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-top: 14px; padding: 6px 18px; }
+  .pd-set-info-row { align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; gap: 16px; justify-content: space-between; padding: 10px 0; }
+  .pd-set-info-row:last-child { border-bottom: 0; }
+  .pd-set-info-k { color: var(--text-muted); font-size: 12.5px; }
+  .pd-set-info-v { color: var(--text); font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pd-danger { align-items: center; border: 1px solid rgba(248,81,73,0.3); border-radius: 10px; display: flex; gap: 16px; justify-content: space-between; margin-top: 14px; padding: 16px 18px; }
+  .pd-danger form { margin: 0; }
+  .pd-danger-title { color: var(--text); font-size: 14px; font-weight: 500; }
+  .pd-danger-sub { color: var(--text-muted); font-size: 12.5px; margin-top: 3px; }
+
+  /* ---- Shared empty state ---- */
+  .pd-empty { align-items: center; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px; padding: 40px 16px; text-align: center; }
+  .pd-empty-title { color: var(--text); font-size: 15px; }
+  .pd-empty-sub { font-size: 13px; max-width: 360px; }
+  .pd-empty form { margin: 0; }
+
+  @keyframes pd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  @media (max-width: 720px) {
+    .pd-head { flex-direction: column; }
+    .pd-tabs { overflow-x: auto; }
+  }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.pd-tab'));
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.pd-panel'));
+    if (!tabs.length) return;
+    var dbLoaded = false;
+
+    function show(name, focus) {
+      tabs.forEach(function (t) {
+        var on = t.dataset.tab === name;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+      });
+      panels.forEach(function (p) { p.hidden = p.id !== 'panel-' + name; });
+      try { history.replaceState(null, '', '#' + name); } catch (e) {}
+      if (name === 'databases') loadDatabases();
+    }
+
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener('click', function () { show(tab.dataset.tab); });
+      tab.addEventListener('keydown', function (e) {
+        var idx = null;
+        if (e.key === 'ArrowRight') idx = (i + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') idx = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') idx = 0;
+        else if (e.key === 'End') idx = tabs.length - 1;
+        if (idx !== null) { e.preventDefault(); show(tabs[idx].dataset.tab, true); }
+      });
+    });
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function loadDatabases() {
+      if (dbLoaded) return;
+      dbLoaded = true;
+      var host = document.querySelector('.pd-db');
+      if (!host) return;
+      var url = host.dataset.dbUrl;
+      fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+        if (!data || !data.available || !data.tables || !data.tables.length) {
+          host.innerHTML = '<div class="pd-db-empty">' +
+            esc((data && data.error) || 'No database has been built for this project yet. It is created the first time the agent runs a Django project.') +
+            '</div>';
+          return;
+        }
+        host.innerHTML = data.tables.map(function (t) {
+          var cols = (t.columns || []).map(function (c) {
+            return '<span class="pd-db-col' + (c.pk ? ' pd-db-col-pk' : '') + '">' +
+              esc(c.name) + '<span class="pd-db-col-type"> ' + esc(c.type || '') + '</span></span>';
+          }).join('');
+          return '<div class="pd-db-table">' +
+            '<div class="pd-db-table-head"><span class="pd-db-table-name">' + esc(t.name) + '</span>' +
+            '<span class="pd-db-table-count">' + t.count + ' row' + (t.count === 1 ? '' : 's') + '</span></div>' +
+            '<div class="pd-db-cols">' + cols + '</div></div>';
+        }).join('');
+      }).catch(function () {
+        host.innerHTML = '<div class="pd-db-empty">Could not load the database.</div>';
+        dbLoaded = false; // allow a retry on next activation
+      });
+    }
+
+    // Deep-link: open the tab named in the URL hash on load.
+    var initial = (location.hash || '').replace('#', '');
+    if (initial && tabs.some(function (t) { return t.dataset.tab === initial; })) show(initial);
+  })();
+</script>
+{% endblock %}

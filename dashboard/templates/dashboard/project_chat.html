@@ -1,0 +1,188 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+{% load kursinis_assets %}
+{% block title %}{{ project.name }} · Project chat{% endblock %}
+{% block body_class %}chat-page{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  .chat-workspace ::-webkit-scrollbar { width: 8px; height: 8px; }
+  .chat-workspace ::-webkit-scrollbar-thumb { background: #333; border-radius: 6px; }
+  .chat-workspace ::-webkit-scrollbar-track { background: transparent; }
+  .topbar-move { margin: 0; }
+  .topbar-move select { font-size: 12px; min-height: 0; padding: 4px 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="chat-workspace"
+         data-project-chat="1"
+         data-chat-id="{{ chat.id }}"
+         data-loose="{% if project.is_loose %}1{% else %}0{% endif %}"
+         data-status="{{ chat.status }}"
+         data-logs-url="{% url 'dashboard-chat-logs' chat.id %}"
+         data-resources-url="{% url 'dashboard-chat-resources' chat.id %}"
+         data-send-url="{% url 'dashboard-chat-send' chat.id %}"
+         data-retry-url="{% url 'dashboard-chat-retry' chat.id %}"
+         data-plan-url="{% url 'dashboard-chat-plan' chat.id %}"
+         data-plan-refine-url="{% url 'dashboard-chat-plan-refine' chat.id %}"
+         data-implement-url="{% url 'dashboard-chat-implement' chat.id %}"
+         data-rename-url="{% url 'dashboard-chat-rename' chat.id %}"
+         data-move-url="{% url 'dashboard-chat-move' chat.id %}"
+         data-models-url="{% url 'dashboard-chat-models' chat.id %}"
+         data-file-url="{% url 'dashboard-project-file' project.id %}"
+         data-preview-url-template="{% url 'dashboard-project-preview' project.id '__ACTION__' %}"
+         data-database-url="{% url 'dashboard-project-database' project.id %}">
+  {% csrf_token %}
+
+  <div class="chat-topbar">
+    <div class="topbar-left">
+      {% if project.is_loose %}
+      <span class="run-num">❯</span>
+      <span class="run-title" id="chat-title-label">{{ chat.title|default:"New chat" }}</span>
+      {% else %}
+      <span class="run-num">❏</span>
+      <span class="run-title">{{ project.name }}</span>
+      {% endif %}
+      <button type="button" class="km-chip" id="view-plan-chip" hidden>View plan</button>
+      <button type="button" class="km-chip" id="tasks-chip" hidden>Tasks</button>
+    </div>
+    <div class="topbar-center">
+      {% if not project.is_loose %}
+      <div class="chat-switch" id="chat-switch">
+        <button type="button" class="chat-switch-btn" id="chat-switch-btn" aria-haspopup="true" aria-expanded="false">
+          <span class="chat-switch-title">{{ chat.title|default:"New chat" }}</span>
+          <span class="chat-switch-caret">▾</span>
+        </button>
+        <div class="chat-switch-menu" id="chat-switch-menu" hidden>
+          <form method="post" action="{% url 'dashboard-project-new-chat' project.id %}" class="chat-switch-new">{% csrf_token %}<button type="submit" class="chat-switch-newbtn">＋ New chat</button></form>
+          <div class="chat-switch-list">
+            {% for c in chats %}{% if c.settings.mode != 'prompt_writer' %}
+            <a class="chat-switch-item {% if c.id == chat.id %}active{% endif %}" href="{% url 'dashboard-project-chat' c.id %}">
+              <span class="chat-switch-item-title">{{ c.title|default:"New chat" }}</span>
+              <span class="chat-switch-item-meta">{{ c.created_at|timesince }} ago</span>
+            </a>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <!-- Header actions intentionally minimal — Rename / Move to project / Delete live in the sidebar
+         "Recent" ⋯ menu; delete a whole project from the Projects page. -->
+    <div class="topbar-right"></div>
+  </div>
+
+  <!-- Start collapsed (right pane width 0) so it can only ever slide OPEN when a tab becomes
+       ready — never render expanded then snap shut on load (that caused a visible flash). -->
+  <div class="chat-body wb-collapsed">
+    <div class="chat-left">
+      <div class="chat-feed" id="chat-feed">
+        <div class="chat-empty chat-loading" id="chat-empty" role="status" aria-live="polite">
+          <span class="chat-loading-spinner" aria-hidden="true"></span>
+          <span class="chat-loading-text">Loading conversation<span class="chat-loading-dots"><i></i><i></i><i></i></span></span>
+        </div>
+      </div>
+
+      {% if chat.settings.mode == 'prompt_writer' %}
+      <div class="draft-handoff" id="draft-handoff" hidden>
+        <span class="draft-handoff-label">Structured prompt ready:</span>
+        <div class="draft-handoff-actions">
+          <form method="post" action="{% url 'dashboard-create-from-draft' chat.id 'project' %}">{% csrf_token %}<button class="button primary" type="submit">Create project ▶</button></form>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="retry-bar" id="retry-bar" hidden>
+        <div class="retry-bar-row">
+          <span class="retry-bar-label">The last turn failed.</span>
+          <label class="retry-bar-model">Model
+            <select id="retry-model">
+              <option value="">Auto</option>
+              {% if current_model_tag %}<option value="{{ current_model_tag }}" selected>{{ current_model_tag }}</option>{% endif %}
+            </select>
+          </label>
+          <button type="button" class="ghost-btn small" id="retry-edit-btn">Edit prompt</button>
+          <button type="button" class="button primary small" id="retry-btn">Retry ▶</button>
+        </div>
+        <textarea id="retry-prompt" class="retry-bar-prompt" rows="3" hidden></textarea>
+        <div class="retry-bar-status" id="retry-status" hidden></div>
+      </div>
+
+      <button type="button" class="ctx-meter" id="ctx-meter" hidden aria-live="polite">
+        <span class="ctx-meter-bar"><span class="ctx-meter-fill" id="ctx-meter-fill"></span></span>
+        <span class="ctx-meter-text" id="ctx-meter-text"></span>
+        <span class="ctx-meter-action" id="ctx-meter-action">Compact now</span>
+      </button>
+
+      <form class="chat-input" id="chat-input"
+            data-upload-url="{% url 'dashboard-project-upload' project.id %}"
+            data-files-url="{% url 'dashboard-project-files' project.id %}"
+            data-clear-url="{% url 'dashboard-chat-clear' chat.id %}"
+            data-settings-url="{% url 'dashboard-chat-settings' chat.id %}"
+            data-compact-url="{% url 'dashboard-chat-compact' chat.id %}"
+            data-stop-url="{% url 'dashboard-chat-stop' chat.id %}">
+        <textarea id="chat-input-text" rows="1" placeholder="Send a follow-up…"></textarea>
+        <div class="chat-input-bar">
+          <div class="chat-input-tools">
+            <button type="button" class="chat-tool cm-add-btn" aria-label="Add context" title="Add context" aria-haspopup="true" aria-expanded="false">+</button>
+            <button type="button" class="chat-tool boxed cm-actions-btn" aria-label="Actions" title="Actions" aria-haspopup="true" aria-expanded="false">/</button>
+          </div>
+          <div class="chat-input-actions">
+            <div class="chat-send-slot">
+              <button type="button" class="chat-stop-btn" id="chat-stop-btn" aria-label="Stop the model" title="Stop" hidden><span class="stop-glyph"></span></button>
+              <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Send"><span class="send-arrow">↑</span></button>
+            </div>
+          </div>
+        </div>
+        {% include "dashboard/_composer_menus.html" with mode="chat" models=models cur_model=chat.settings.model cur_effort=chat.settings.effort cur_thinking=chat.settings.thinking cur_planning=chat.settings.planning cur_pursue=chat.settings.pursue_goal cur_auto=chat.settings.auto_approve %}
+      </form>
+      <div class="composer-hint">Enter to send · Shift+Enter for newline</div>
+    </div>
+
+    <div class="chat-splitter" id="chat-splitter" title="Drag to resize"></div>
+
+    <aside class="chat-right" id="agent-workbench">
+      <div class="preview-tabs" role="tablist">
+        <button type="button" class="preview-tab" data-tab="files" hidden>Files</button>
+        <button type="button" class="preview-tab" data-tab="tasks" hidden>Tasks</button>
+        <button type="button" class="preview-tab" data-tab="resources" hidden>Resources</button>
+        <button type="button" class="preview-tab" data-tab="preview" hidden>Preview</button>
+        <button type="button" class="preview-tab" data-tab="database" hidden>Database</button>
+      </div>
+      <div class="preview-pane" data-pane="files" hidden></div>
+      <div class="preview-pane" data-pane="tasks" hidden></div>
+      <div class="preview-pane" data-pane="resources" hidden></div>
+      <div class="preview-pane" data-pane="preview" hidden></div>
+      <div class="preview-pane" data-pane="database" hidden></div>
+      <div class="preview-pane" data-pane="empty"></div>
+    </aside>
+  </div>
+
+  <aside class="pw-drawer" id="pw-drawer" aria-label="Prompt Writer"
+         data-pw-url="{% url 'dashboard-project-prompt-writer' project.id %}">
+    <div class="pw-head">
+      <span class="pw-title">✦ Prompt Writer</span>
+      <button type="button" class="pw-close" id="pw-close" aria-label="Close">✕</button>
+    </div>
+    <div class="pw-intro">Describe a rough idea — it asks a few questions, then drafts a clear prompt you can drop into the chat.</div>
+    <div class="pw-feed" id="pw-feed"></div>
+    <div class="pw-use" id="pw-use" hidden>
+      <button type="button" class="button primary" id="pw-use-btn">Use this prompt →</button>
+    </div>
+    <form class="pw-input" id="pw-input">
+      <textarea id="pw-input-text" rows="1" placeholder="Describe your idea…"></textarea>
+      <button type="submit" class="pw-send" id="pw-send" aria-label="Send"><span class="send-glyph"></span></button>
+    </form>
+  </aside>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static_v 'dashboard/composer-menus.js' %}"></script>
+<script src="{% static_v 'dashboard/workbench.js' %}"></script>
+<script src="{% static_v 'dashboard/chat.js' %}"></script>
+<script src="{% static_v 'dashboard/modals.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,33 @@
+# LLM
+ollama>=0.4.0
+openai>=1.50.0
+
+# Agent framework
+langgraph>=0.2.50
+langchain-core>=0.3.0
+
+# RAG
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+
+# Benchmark / data
+pyyaml>=6.0
+pydantic>=2.8
+
+# Code quality / sandbox
+pylint>=3.2
+pytest>=8.0
+pytest-django>=4.9
+django>=5.1
+djangorestframework>=3.15
+
+# CLI / utilities
+typer>=0.12
+rich>=13.7
+tqdm>=4.66
+reportlab>=4.2
+openpyxl>=3.1
+psutil>=5.9
+
+# Dev
+ruff>=0.6

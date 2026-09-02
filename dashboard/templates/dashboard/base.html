@@ -1,0 +1,874 @@
+{% load static %}
+{% load kursinis_assets %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>try { var d = document.documentElement; if (localStorage.getItem('kursinis-sidebar') === 'open') d.classList.add('side-open'); if (localStorage.getItem('kursinis-no-anim') === '1') d.classList.add('no-anim'); } catch (e) {}</script>
+    <title>{% block title %}DI testavimo platforma{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'dashboard/logo.svg' %}">
+    <link rel="stylesheet" href="{% static_v 'dashboard/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static_v 'dashboard/styles.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+      /* ============================================================
+         Claude.ai-style theme. Defined here (not via Tailwind utilities)
+         because the bundled tailwind.css is a purged build and there is
+         no Node toolchain to recompile it. Remapping both the new tokens
+         and the legacy variable names repaints every existing page.
+         ============================================================ */
+      :root {
+        --bg: #1a1a1a;
+        --surface: #242424;
+        --surface-2: #2e2e2e;
+        --border: #333333;
+        --text: #ececec;
+        --text-muted: #888888;
+        --accent: #4287f5;
+        --pass: #3fb950;
+        --fail: #f85149;
+        --running: #d29922;
+        /* Legacy aliases used throughout the original stylesheet. */
+        --panel: #242424;
+        --panel-soft: #242424;
+        --panel-raised: #2e2e2e;
+        --ink: #ececec;
+        --muted: #888888;
+        --line: #333333;
+        --line-strong: #333333;
+        --accent-strong: #4287f5;
+        --green: #3fb950;
+        --red: #f85149;
+        --amber: #d29922;
+        --blue: #888888;
+        --code: #0f0f0f;
+        --radius: 8px;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+        letter-spacing: 0.01em;
+        margin: 0;
+      }
+
+      a { color: inherit; text-decoration: none; }
+
+      /* ---- Shell: 52px icon sidebar + flexible main ---- */
+      /* Lock the shell to the viewport so the sidebar stays full-height/fixed and the main
+         area (not the page) scrolls. */
+      .shell { display: flex; height: 100vh; overflow: hidden; }
+
+      .sidebar {
+        align-items: stretch;
+        background: #161111;
+        border-right: 1px solid #2a2a2a;
+        display: flex;
+        flex-direction: column;
+        flex: none;
+        gap: 2px;
+        height: 100vh;
+        overflow: hidden;
+        padding: 14px 0;
+        transition: width 0.22s ease;
+        width: 52px;
+      }
+      html.side-open .sidebar { width: 188px; }
+
+      .side-logo {
+        align-items: center;
+        color: var(--accent);
+        display: flex;
+        flex: none;
+        font-size: 20px;
+        height: 40px;
+        justify-content: center;
+        width: 52px;
+      }
+      .brand-logo { display: block; width: 28px; height: 28px; }
+
+      .side-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; width: 100%; }
+
+      .side-link {
+        align-items: center;
+        color: var(--text-muted);
+        display: flex;
+        height: 48px;
+        justify-content: flex-start;
+        overflow: hidden;
+        white-space: nowrap;
+        width: 100%;
+      }
+      .side-ico {
+        align-items: center;
+        display: flex;
+        flex: none;
+        font-size: 18px;
+        height: 48px;
+        justify-content: center;
+        width: 52px;
+      }
+      .side-label {
+        color: inherit;
+        font-size: 13px;
+        opacity: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: opacity 0.16s ease;
+      }
+      html.side-open .side-label { opacity: 1; }
+
+      .side-link:hover { background: var(--surface); color: var(--text); }
+      .side-link.active { color: var(--accent); }
+
+      .side-foot { display: flex; flex-direction: column; gap: 2px; margin-top: auto; width: 100%; }
+      .side-toggle {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        cursor: pointer;
+        min-height: 0;
+        padding: 0;
+      }
+      .side-toggle:hover { background: var(--surface); }
+      .side-toggle .side-ico { transition: transform 0.22s ease; }
+      html.side-open .side-toggle .side-ico { transform: rotate(180deg); }
+
+      /* ---- Recent chats (only in the expanded rail) ---- */
+      .side-recent { display: none; }
+      html.side-open .side-recent {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        margin-top: 12px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .side-recent-head {
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        padding: 4px 16px;
+        text-transform: uppercase;
+      }
+      .side-recent-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+      .side-recent-row { align-items: center; display: flex; gap: 2px; padding-right: 4px; position: relative; }
+      .side-recent-row:hover, .side-recent-row.menu-open { background: var(--surface); }
+      .side-recent-row.active { background: var(--surface); }
+      .side-recent-row.active .side-recent-title { color: var(--accent); }
+      .side-recent-link { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; padding: 6px 0 6px 16px; }
+      .side-recent-title { color: var(--text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .side-recent-proj { color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .side-recent-menu-btn {
+        background: transparent; border: 0; border-radius: 4px; color: var(--text-muted);
+        cursor: pointer; flex: none; font-size: 16px; line-height: 1; min-height: 0; opacity: 0; padding: 4px 6px;
+      }
+      .side-recent-row:hover .side-recent-menu-btn, .side-recent-row.menu-open .side-recent-menu-btn { opacity: 1; }
+      .side-recent-menu-btn:hover { background: var(--surface-2); color: var(--text); }
+      .side-recent-rename { background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; color: var(--text); flex: 1 1 auto; font-size: 13px; margin: 4px 4px 4px 14px; min-width: 0; padding: 4px 6px; }
+
+      /* Floating action menu (appended to body so the sidebar's overflow:hidden can't clip it). */
+      .km-ctx-menu {
+        background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); min-width: 172px; padding: 4px; position: fixed; z-index: 2000;
+      }
+      .km-ctx-item {
+        background: transparent; border: 0; border-radius: 6px; color: var(--text); cursor: pointer;
+        display: block; font-size: 13px; min-height: 0; padding: 7px 10px; text-align: left; white-space: nowrap; width: 100%;
+      }
+      .km-ctx-item:hover { background: var(--surface); }
+      .km-ctx-item.danger { color: #ff7b72; }
+      .km-ctx-item.disabled { color: var(--text-muted); cursor: default; }
+      .km-ctx-item.disabled:hover { background: transparent; }
+      .km-ctx-sep { background: var(--border); height: 1px; margin: 4px 0; }
+      .km-ctx-label { color: var(--text-muted); font-size: 10px; letter-spacing: 0.05em; padding: 6px 10px 2px; text-transform: uppercase; }
+
+      /* Account footer: avatar + name when signed in, else Sign in / Sign up. */
+      .side-foot-form { margin: 0; width: 100%; }
+      .side-foot-btn {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        cursor: pointer;
+        min-height: 0;
+        padding: 0;
+        width: 100%;
+      }
+      .side-foot-btn:hover { background: var(--surface); color: var(--text); }
+      .side-user { cursor: default; }
+      .side-user:hover { background: transparent; }
+      .side-avatar {
+        align-items: center;
+        background: var(--accent);
+        border-radius: 50%;
+        color: #fff;
+        display: flex;
+        font-size: 12px;
+        font-weight: 600;
+        height: 26px;
+        justify-content: center;
+        width: 26px;
+      }
+      /* Signed-out: stacked Sign up (white) / Sign in (dark grey) buttons. Icon-only when the
+         rail is collapsed, full text buttons when expanded. */
+      .side-auth { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; padding: 0 10px; }
+      .side-auth-btn {
+        align-items: center;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        font-size: 13px;
+        font-weight: 600;
+        gap: 8px;
+        height: 34px;
+        justify-content: center;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .side-auth-btn.signup { background: #ffffff; color: #1a1a1a; }
+      .side-auth-btn.signup:hover { background: #e9e9e9; }
+      .side-auth-btn.signin { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+      .side-auth-btn.signin:hover { background: var(--surface); }
+      .side-auth-ico { font-size: 14px; line-height: 1; }
+      .side-auth-btn .side-label { display: none; }
+      html.side-open .side-auth-btn .side-label { display: inline; opacity: 1; }
+      html.side-open .side-auth-btn .side-auth-ico { display: none; }
+
+      .main {
+        background: var(--bg);
+        flex: 1;
+        min-width: 0;
+        overflow-y: auto;
+        padding: 32px;
+      }
+
+      /* The chat execution page is full-bleed (controls its own padding). */
+      body.chat-page .main { padding: 0; }
+
+      /* ---- Flat repaint of the original component classes ---- */
+      .button,
+      button {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        min-height: 36px;
+      }
+      .button:hover,
+      button:hover { background: var(--surface); }
+      .button.primary,
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 500;
+      }
+      .button.primary:hover,
+      button.primary:hover { background: #2f6fe0; }
+      .button.danger,
+      button.danger { color: #ff7b72; }
+
+      .page-header h1 { font-weight: 300; letter-spacing: 0.01em; }
+      .eyebrow { color: var(--text-muted); font-weight: 600; }
+
+      .panel,
+      .metric-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+
+      input, select, textarea {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+      }
+      input::placeholder, textarea::placeholder { color: var(--text-muted); }
+      input:focus, select:focus, textarea:focus { border-color: #555; outline: none; }
+
+      .badge { border-radius: 6px; }
+      table th { color: var(--text-muted); }
+      table th, table td { border-bottom: 1px solid var(--surface); }
+      tbody tr:hover { background: var(--surface); }
+
+      .run-row,
+      .status-stack > div,
+      .timeline-row {
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid var(--surface);
+        border-radius: 6px;
+      }
+      .run-row:hover,
+      .timeline-row:hover { background: var(--surface); }
+      .empty { color: var(--text-muted); font-style: italic; }
+
+      /* ---- Home landing ---- */
+      .home-hero {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        justify-content: center;
+        margin: 0 auto;
+        max-width: 560px;
+        min-height: calc(100vh - 64px);
+      }
+      .home-greeting {
+        align-items: center;
+        color: var(--text);
+        display: flex;
+        font-size: 28px;
+        font-weight: 300;
+        gap: 12px;
+        margin: 0;
+      }
+      .home-greeting .logo { color: var(--accent); font-size: 24px; }
+      .home-greeting .brand-logo { display: inline-block; width: 34px; height: 34px; vertical-align: -7px; }
+      .greet { white-space: pre-wrap; }   /* preserve the trailing space the caret sits after */
+      .greet-caret {
+        animation: greet-blink 1.05s steps(1) infinite;
+        background: var(--accent);
+        display: inline-block;
+        height: 0.95em;
+        margin-left: 2px;
+        vertical-align: -0.1em;
+        width: 2px;
+      }
+      @keyframes greet-blink { 50% { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .greet-caret { animation: none; display: none; } }
+
+      /* Only animation allowed: the active-entry / running pulse. */
+      @keyframes pulse-active { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+      @media (max-width: 700px) {
+        .main { padding: 18px; }
+        body.chat-page .main { padding: 0; }
+      }
+    </style>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body class="{% block body_class %}{% endblock %}" data-authed="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+    {% block shell %}
+    {% with url_name=request.resolver_match.url_name|default:"" %}
+    <div class="shell">
+      <aside class="sidebar">
+        <a class="side-logo" href="{% url 'dashboard' %}" aria-label="DI testavimo platforma"><img class="brand-logo" src="{% static 'dashboard/logo.svg' %}" alt="" width="28" height="28"></a>
+        <nav class="side-nav">
+          <a class="side-link {% if url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" aria-label="New chat"><span class="side-ico"><svg class="ico ico-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="side-label">New chat</span></a>
+          <a class="side-link {% if 'project' in url_name or 'chat' in url_name %}{% if not nav_active_loose %}active{% endif %}{% endif %}" href="{% url 'dashboard-projects' %}" aria-label="Projects"
+             data-auth-gate data-gate-body="Projects keep your builds, chats and files together. Sign in or create an account to open them."><span class="side-ico"><svg class="ico ico-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg></span><span class="side-label">Projects</span></a>
+          <a class="side-link {% if url_name == 'dashboard-models' or url_name == 'dashboard-ollama-model-page' or url_name == 'dashboard-model-create' or url_name == 'dashboard-model-edit' %}active{% endif %}" href="{% url 'dashboard-models' %}" aria-label="Models"><span class="side-ico"><svg class="ico ico-anim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span><span class="side-label">Models</span></a>
+        </nav>
+        {% if recent_chats %}
+        <div class="side-recent">
+          <div class="side-recent-head">Recent</div>
+          <div class="side-recent-list" id="side-recent-list">
+            {% for rc in recent_chats %}
+            <div class="side-recent-row{% if rc.active %} active{% endif %}"
+                 data-chat-id="{{ rc.id }}"
+                 data-rename-url="{{ rc.rename_url }}"
+                 data-delete-url="{{ rc.delete_url }}"
+                 data-move-url="{{ rc.move_url }}"
+                 data-is-loose="{{ rc.is_loose|yesno:'1,0' }}">
+              <a class="side-recent-link" href="{{ rc.url }}">
+                <span class="side-recent-title">{{ rc.title }}</span>
+                {% if rc.project_label %}<span class="side-recent-proj">❏ {{ rc.project_label }}</span>{% endif %}
+              </a>
+              <button type="button" class="side-recent-menu-btn" aria-label="Chat actions" title="Actions">⋯</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <div class="side-foot">
+          {% if user.is_authenticated %}
+          {% firstof user.first_name user.get_username as display_name %}
+          <button type="button" class="side-link side-user" id="acct-btn" aria-haspopup="menu" aria-expanded="false" title="{{ display_name }}"
+                  data-name="{{ display_name }}" data-email="{{ user.get_username }}"
+                  data-profile-url="{% url 'dashboard-settings' %}?tab=profile"
+                  data-settings-url="{% url 'dashboard-settings' %}"
+                  data-prefs-url="{% url 'dashboard-settings' %}?tab=preferences"
+                  data-help-url="{% url 'dashboard-settings' %}?tab=help">
+            <span class="side-ico"><span class="side-avatar">{{ display_name|first|upper }}</span></span>
+            <span class="side-label">{{ display_name }}</span>
+          </button>
+          <form method="post" action="{% url 'dashboard-signout' %}" id="acct-signout-form" class="side-foot-form" hidden>{% csrf_token %}</form>
+          {% else %}
+          <div class="side-auth">
+            <a class="side-auth-btn signup" href="{% url 'dashboard-signup' %}" aria-label="Sign up"><span class="side-auth-ico">＋</span><span class="side-label">Sign up</span></a>
+            <a class="side-auth-btn signin" href="{% url 'dashboard-signin' %}" aria-label="Sign in"><span class="side-auth-ico">→</span><span class="side-label">Sign in</span></a>
+          </div>
+          {% endif %}
+          <button type="button" class="side-link side-toggle" id="side-toggle" aria-label="Expand menu" aria-expanded="false"><span class="side-ico">›</span><span class="side-label">Collapse</span></button>
+        </div>
+      </aside>
+      <main class="main">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+    {{ move_targets|json_script:"km-move-targets" }}
+    <form id="km-csrf-form" hidden>{% csrf_token %}</form>
+    {% endwith %}
+    {% endblock %}
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var btn = document.getElementById('side-toggle');
+        if (!btn) return;
+        function sync() {
+          var open = root.classList.contains('side-open');
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.setAttribute('aria-label', open ? 'Collapse menu' : 'Expand menu');
+        }
+        btn.addEventListener('click', function () {
+          var open = root.classList.toggle('side-open');
+          try { localStorage.setItem('kursinis-sidebar', open ? 'open' : 'closed'); } catch (e) {}
+          sync();
+        });
+        sync();
+      })();
+    </script>
+    <script>
+      /* Reusable styled confirm dialog (replaces window.confirm for destructive actions).
+         window.KmConfirm({title, bodyPrefix, name, bodySuffix, confirmLabel, cancelLabel, danger})
+         returns a Promise<boolean>. `name` renders bold between bodyPrefix/bodySuffix (text-safe). */
+      window.KmConfirm = function (opts) {
+        opts = opts || {};
+        window._kmConfirmSeq = (window._kmConfirmSeq || 0) + 1;
+        var uid = window._kmConfirmSeq;
+        var trigger = document.activeElement; // restore focus here on close
+        return new Promise(function (resolve) {
+          var overlay = document.createElement('div');
+          overlay.className = 'km-overlay km-confirm-overlay';
+          var modal = document.createElement('div');
+          modal.className = 'km-modal km-confirm';
+          modal.setAttribute('role', 'alertdialog');
+          modal.setAttribute('aria-modal', 'true');
+          modal.setAttribute('aria-labelledby', 'km-confirm-title-' + uid);
+          modal.setAttribute('aria-describedby', 'km-confirm-body-' + uid);
+          var h = document.createElement('div');
+          h.className = 'km-confirm-title';
+          h.id = 'km-confirm-title-' + uid;
+          h.textContent = opts.title || 'Are you sure?';
+          var body = document.createElement('div');
+          body.className = 'km-confirm-body';
+          body.id = 'km-confirm-body-' + uid;
+          if (opts.name) {
+            if (opts.bodyPrefix) body.appendChild(document.createTextNode(opts.bodyPrefix));
+            var strong = document.createElement('strong');
+            strong.textContent = opts.name;
+            body.appendChild(strong);
+            body.appendChild(document.createTextNode(opts.bodySuffix != null ? opts.bodySuffix : '.'));
+          } else {
+            body.textContent = opts.body || opts.bodyPrefix || '';
+          }
+          var foot = document.createElement('div');
+          foot.className = 'km-confirm-foot';
+          var cancel = document.createElement('button');
+          cancel.type = 'button';
+          cancel.className = 'km-btn';
+          cancel.textContent = opts.cancelLabel || 'Cancel';
+          var ok = document.createElement('button');
+          ok.type = 'button';
+          ok.className = 'km-btn ' + (opts.danger ? 'km-btn-danger' : 'km-btn-primary');
+          ok.textContent = opts.confirmLabel || 'OK';
+          foot.appendChild(cancel);
+          foot.appendChild(ok);
+          modal.appendChild(h);
+          modal.appendChild(body);
+          modal.appendChild(foot);
+          overlay.appendChild(modal);
+          document.body.appendChild(overlay);
+          var done = false;
+          function finish(val) {
+            if (done) return;
+            done = true;
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            // return focus to whatever opened the dialog (a11y: don't dump focus to <body>)
+            if (trigger && trigger.focus && document.contains(trigger)) {
+              try { trigger.focus(); } catch (e) {}
+            }
+            resolve(val);
+          }
+          function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            else if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+            else if (e.key === 'Tab') {
+              // trap focus inside the dialog (only two focusable controls: cancel, ok)
+              var focusables = [cancel, ok];
+              var i = focusables.indexOf(document.activeElement);
+              var next = e.shiftKey ? (i <= 0 ? focusables.length - 1 : i - 1) : (i === focusables.length - 1 ? 0 : i + 1);
+              e.preventDefault();
+              focusables[next].focus();
+            }
+          }
+          cancel.addEventListener('click', function () { finish(false); });
+          ok.addEventListener('click', function () { finish(true); });
+          overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) finish(false); });
+          document.addEventListener('keydown', onKey);
+          ok.focus();
+        });
+      };
+    </script>
+    <script>
+      /* Sign-in gate: an anonymous visitor who tries a signed-in-only surface (starting a chat,
+         opening Projects) gets a Sign in / Sign up popup instead. Models + the home page stay open.
+         Mark a trigger with data-auth-gate (a link/button click, or a form submit); data-gate-title /
+         data-gate-body override the wording. window.KmAuthGate({title, body}) opens it directly. */
+      (function () {
+        var SIGNIN = '{% url 'dashboard-signin' %}';
+        var SIGNUP = '{% url 'dashboard-signup' %}';
+
+        function withNext(url) {
+          return url + '?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+        }
+
+        window.KmAuthGate = function (opts) {
+          opts = opts || {};
+          if (document.querySelector('.km-auth-overlay')) return;   // never stack two gates
+          var trigger = document.activeElement;
+          var overlay = document.createElement('div');
+          overlay.className = 'km-overlay km-auth-overlay';
+          var modal = document.createElement('div');
+          modal.className = 'km-modal km-confirm km-auth';
+          modal.setAttribute('role', 'dialog');
+          modal.setAttribute('aria-modal', 'true');
+          modal.setAttribute('aria-labelledby', 'km-auth-title');
+          var h = document.createElement('div');
+          h.className = 'km-confirm-title';
+          h.id = 'km-auth-title';
+          h.textContent = opts.title || 'Sign in to continue';
+          var body = document.createElement('div');
+          body.className = 'km-confirm-body';
+          body.textContent = opts.body || 'Sign in or create an account to continue.';
+          var foot = document.createElement('div');
+          foot.className = 'km-confirm-foot';
+          var signup = document.createElement('a');
+          signup.className = 'km-btn';
+          signup.href = withNext(SIGNUP);
+          signup.textContent = 'Sign up';
+          var signin = document.createElement('a');
+          signin.className = 'km-btn km-btn-primary';
+          signin.href = withNext(SIGNIN);
+          signin.textContent = 'Sign in';
+          foot.appendChild(signup);
+          foot.appendChild(signin);
+          modal.appendChild(h);
+          modal.appendChild(body);
+          modal.appendChild(foot);
+          overlay.appendChild(modal);
+          document.body.appendChild(overlay);
+          function close() {
+            document.removeEventListener('keydown', onKey);
+            overlay.remove();
+            if (trigger && trigger.focus && document.contains(trigger)) {
+              try { trigger.focus(); } catch (e) {}
+            }
+          }
+          function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); close(); }
+            else if (e.key === 'Tab') {
+              // trap focus inside the popup (only two focusable controls: sign up, sign in)
+              var f = [signup, signin];
+              var i = f.indexOf(document.activeElement);
+              var n = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === f.length - 1 ? 0 : i + 1);
+              e.preventDefault();
+              f[n].focus();
+            }
+          }
+          overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
+          document.addEventListener('keydown', onKey);
+          signin.focus();
+        };
+
+        if (document.body.dataset.authed === '1') return;   // signed in: the markers stay inert
+
+        function open(el) {
+          window.KmAuthGate({ title: el.getAttribute('data-gate-title'), body: el.getAttribute('data-gate-body') });
+        }
+        // Capture phase so the page's own submit/click handlers never run for a gated action.
+        document.addEventListener('click', function (e) {
+          var el = e.target.closest && e.target.closest('a[data-auth-gate], button[data-auth-gate]');
+          if (!el) return;
+          e.preventDefault();
+          e.stopPropagation();
+          open(el);
+        }, true);
+        document.addEventListener('submit', function (e) {
+          var form = e.target.closest && e.target.closest('form[data-auth-gate]');
+          if (!form) return;
+          e.preventDefault();
+          e.stopPropagation();
+          open(form);
+        }, true);
+      })();
+    </script>
+    <script>
+      /* Sidebar account menu: clicking the profile opens Profile / Settings / Preferences / Help /
+         Sign out (Sign out submits the hidden POST logout form). Floating, appended to body so the
+         sidebar's overflow:hidden can't clip it; opens upward since the trigger sits at the bottom. */
+      (function () {
+        var btn = document.getElementById('acct-btn');
+        if (!btn) return;
+        var ICO = {
+          user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+          gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+          sliders: '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/>',
+          help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+          logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+        };
+        function svg(p) {
+          return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+        }
+        function linkItem(iconPaths, label, href) {
+          var a = document.createElement('a');
+          a.className = 'km-ctx-item km-acct-item';
+          a.href = href;
+          a.setAttribute('role', 'menuitem');
+          a.innerHTML = svg(iconPaths);
+          var s = document.createElement('span');
+          s.textContent = label;
+          a.appendChild(s);
+          return a;
+        }
+        var menu = null;
+        function close(returnFocus) {
+          if (menu) { menu.remove(); menu = null; }
+          btn.setAttribute('aria-expanded', 'false');
+          if (returnFocus && btn.focus) btn.focus();
+        }
+        function open() {
+          close();
+          menu = document.createElement('div');
+          menu.className = 'km-ctx-menu km-acct-menu';
+          menu.setAttribute('role', 'menu');
+          var head = document.createElement('div');
+          head.className = 'km-acct-head';
+          var av = document.createElement('span');
+          av.className = 'km-acct-avatar';
+          av.textContent = (btn.dataset.name || '?').charAt(0).toUpperCase();
+          var meta = document.createElement('div');
+          meta.className = 'km-acct-meta';
+          var nm = document.createElement('div');
+          nm.className = 'km-acct-name';
+          nm.textContent = btn.dataset.name || '';
+          var em = document.createElement('div');
+          em.className = 'km-acct-email';
+          em.textContent = btn.dataset.email || '';
+          meta.appendChild(nm);
+          meta.appendChild(em);
+          head.appendChild(av);
+          head.appendChild(meta);
+          menu.appendChild(head);
+          var sep1 = document.createElement('div'); sep1.className = 'km-ctx-sep'; menu.appendChild(sep1);
+          menu.appendChild(linkItem(ICO.user, 'Profile', btn.dataset.profileUrl));
+          menu.appendChild(linkItem(ICO.gear, 'Settings', btn.dataset.settingsUrl));
+          menu.appendChild(linkItem(ICO.sliders, 'Preferences', btn.dataset.prefsUrl));
+          menu.appendChild(linkItem(ICO.help, 'Help', btn.dataset.helpUrl));
+          var sep2 = document.createElement('div'); sep2.className = 'km-ctx-sep'; menu.appendChild(sep2);
+          var out = document.createElement('button');
+          out.type = 'button';
+          out.className = 'km-ctx-item km-acct-item danger';
+          out.setAttribute('role', 'menuitem');
+          out.innerHTML = svg(ICO.logout);
+          var os = document.createElement('span');
+          os.textContent = 'Sign out';
+          out.appendChild(os);
+          out.addEventListener('click', function () {
+            var f = document.getElementById('acct-signout-form');
+            if (f) f.submit();
+          });
+          menu.appendChild(out);
+          document.body.appendChild(menu);
+          var r = btn.getBoundingClientRect();
+          var mw = menu.offsetWidth, mh = menu.offsetHeight;
+          var left = Math.min(Math.max(8, r.left), window.innerWidth - mw - 8);
+          var top = r.top - mh - 6;
+          if (top < 8) top = Math.min(r.bottom + 6, window.innerHeight - mh - 8);
+          menu.style.left = left + 'px';
+          menu.style.top = top + 'px';
+          btn.setAttribute('aria-expanded', 'true');
+
+          // Keyboard menu semantics: focus the first item, roving Arrow/Home/End, Tab/Esc close.
+          var items = Array.prototype.slice.call(menu.querySelectorAll('.km-acct-item'));
+          items.forEach(function (it) { it.tabIndex = -1; });
+          if (items[0]) items[0].focus();
+          menu.addEventListener('keydown', function (e) {
+            var i = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i <= 0 ? items.length : i) - 1].focus(); }
+            else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+            else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+            else if (e.key === 'Tab') { close(false); }
+          });
+        }
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (menu) close(false); else open();
+        });
+        document.addEventListener('click', function (e) {
+          if (menu && !menu.contains(e.target) && !btn.contains(e.target)) close(false);
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menu) close(true); });
+      })();
+    </script>
+    <script>
+      /* Sidebar "Recent" per-chat action menu: Rename (inline) / Move to project (loose only) / Delete.
+         The menu is a single floating element appended to <body> so the sidebar's overflow:hidden can't
+         clip it. POSTs mirror app.js (X-CSRFToken header + urlencoded body). */
+      (function () {
+        var list = document.getElementById('side-recent-list');
+        if (!list) return;
+
+        function csrf() {
+          var i = document.querySelector('#km-csrf-form input[name=csrfmiddlewaretoken]');
+          if (i && i.value) return i.value;
+          var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+          return m ? decodeURIComponent(m[1]) : '';
+        }
+        function post(url, data) {
+          var headers = { 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest' };
+          var opts = { method: 'POST', headers: headers };
+          if (data) { headers['Content-Type'] = 'application/x-www-form-urlencoded'; opts.body = new URLSearchParams(data).toString(); }
+          return fetch(url, opts);
+        }
+        var moveTargets = [];
+        try { moveTargets = JSON.parse((document.getElementById('km-move-targets') || {}).textContent || '[]'); } catch (e) {}
+
+        var menu = null, openRow = null;
+        function closeMenu() {
+          if (menu) { menu.remove(); menu = null; }
+          if (openRow) { openRow.classList.remove('menu-open'); openRow = null; }
+        }
+        document.addEventListener('click', function (e) {
+          if (menu && !menu.contains(e.target) && !e.target.classList.contains('side-recent-menu-btn')) closeMenu();
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+        function item(label, cls, onClick) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'km-ctx-item' + (cls ? ' ' + cls : '');
+          b.textContent = label;
+          if (onClick) b.addEventListener('click', onClick); else b.classList.add('disabled');
+          return b;
+        }
+        function labelRow(text) { var d = document.createElement('div'); d.className = 'km-ctx-label'; d.textContent = text; return d; }
+        function sep() { var d = document.createElement('div'); d.className = 'km-ctx-sep'; return d; }
+
+        function startRename(row) {
+          var link = row.querySelector('.side-recent-link');
+          var titleEl = row.querySelector('.side-recent-title');
+          var current = titleEl ? titleEl.textContent.trim() : '';
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'side-recent-rename';
+          input.value = current === 'New chat' ? '' : current;
+          input.maxLength = 200;
+          var btn = row.querySelector('.side-recent-menu-btn');
+          link.style.display = 'none';
+          if (btn) btn.style.display = 'none';
+          row.insertBefore(input, link);
+          input.focus(); input.select();
+          var done = false;
+          function finish(save) {
+            if (done) return; done = true;
+            var val = input.value.trim();
+            input.remove();
+            link.style.display = '';
+            if (btn) btn.style.display = '';
+            if (save && val) {
+              post(row.dataset.renameUrl, { title: val }).then(function (r) {
+                if (r.ok && titleEl) titleEl.textContent = val;
+              }).catch(function () {});
+            }
+          }
+          input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+            else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+          });
+          input.addEventListener('blur', function () { finish(true); });
+        }
+
+        function doMove(row, projectId) {
+          post(row.dataset.moveUrl, { project: projectId }).then(function (r) {
+            return r.json().catch(function () { return {}; });
+          }).then(function (d) {
+            if (d && d.ok && d.chat_url) window.location.href = d.chat_url;
+            else window.alert((d && d.error) || 'Could not move the chat.');
+          }).catch(function () { window.alert('Network error while moving the chat.'); });
+        }
+
+        function doDelete(row) {
+          var titleEl = row.querySelector('.side-recent-title');
+          var title = titleEl ? titleEl.textContent.trim() : 'this chat';
+          window.KmConfirm({
+            title: 'Delete chat?',
+            bodyPrefix: 'This will permanently delete ',
+            name: title,
+            bodySuffix: '. This action cannot be undone.',
+            confirmLabel: 'Delete',
+            danger: true,
+          }).then(function (ok) {
+            if (!ok) return;
+            post(row.dataset.deleteUrl).then(function (r) {
+              if (!r.ok) { window.alert('Could not delete the chat.'); return; }
+              if (row.classList.contains('active')) window.location.href = '/';
+              else row.remove();
+            }).catch(function () { window.alert('Network error while deleting the chat.'); });
+          });
+        }
+
+        function openMenu(row, btn) {
+          closeMenu();
+          openRow = row; row.classList.add('menu-open');
+          menu = document.createElement('div');
+          menu.className = 'km-ctx-menu';
+          menu.appendChild(item('Rename', '', function () { closeMenu(); startRename(row); }));
+          if (row.dataset.isLoose === '1') {
+            if (moveTargets.length) {
+              menu.appendChild(sep());
+              menu.appendChild(labelRow('Move to project'));
+              moveTargets.forEach(function (p) {
+                menu.appendChild(item(p.name, '', function () { closeMenu(); doMove(row, p.id); }));
+              });
+            } else {
+              menu.appendChild(sep());
+              menu.appendChild(item('No projects yet', 'disabled', null));
+            }
+          }
+          menu.appendChild(sep());
+          menu.appendChild(item('Delete', 'danger', function () { closeMenu(); doDelete(row); }));
+          document.body.appendChild(menu);
+          var r = btn.getBoundingClientRect();
+          var mw = menu.offsetWidth, mh = menu.offsetHeight;
+          var left = Math.min(r.right, window.innerWidth - mw - 8);
+          var top = Math.min(r.bottom + 4, window.innerHeight - mh - 8);
+          menu.style.left = Math.max(8, left) + 'px';
+          menu.style.top = Math.max(8, top) + 'px';
+        }
+
+        list.addEventListener('click', function (e) {
+          var btn = e.target.closest('.side-recent-menu-btn');
+          if (!btn) return;
+          e.preventDefault(); e.stopPropagation();
+          var row = btn.closest('.side-recent-row');
+          if (menu && openRow === row) closeMenu(); else openMenu(row, btn);
+        });
+      })();
+    </script>
+    <script src="{% static 'dashboard/vendor/chart.umd.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+    <script src="{% static_v 'dashboard/app.js' %}"></script>
+  </body>
+</html>

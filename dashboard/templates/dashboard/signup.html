@@ -1,0 +1,148 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+{% block title %}Sign up · DI testavimo platforma{% endblock %}
+{% block body_class %}signup-page{% endblock %}
+
+{# Standalone, sidebar-less sign-up: a 4-step wizard (name → login details → birthdate → source). #}
+{% block shell %}
+<div class="signup-screen">
+  <div class="signup-card">
+    <a class="signup-brand" href="{% url 'dashboard' %}"><img class="brand-logo" src="{% static 'dashboard/logo.svg' %}" alt="" style="display:inline-block;width:24px;height:24px;vertical-align:-5px"> Kursinis</a>
+
+    <div class="wiz-progress" id="wiz-progress" aria-hidden="true">
+      <span class="wiz-dot"></span><span class="wiz-dot"></span><span class="wiz-dot"></span><span class="wiz-dot"></span>
+    </div>
+
+    <form method="post" id="signup-form" class="signup-form"
+          data-email-check-url="{% url 'dashboard-signup-email-check' %}">
+      {% csrf_token %}
+      {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+      {# Sits outside the steps, so a bounce back to the offending step still explains itself. #}
+      {% if form.errors %}
+      <div class="auth-nonfield">
+        {% if form.non_field_errors %}{{ form.non_field_errors|striptags }}{% else %}Paskyros sukurti nepavyko — pataisykite pažymėtą lauką.{% endif %}
+        Slaptažodžius reikės suvesti iš naujo.
+      </div>
+      {% endif %}
+
+      <div class="wiz-step" data-step="0">
+        <h1 class="wiz-title">Kaip mums į jus kreiptis?</h1>
+        <label class="auth-field">
+          {{ form.name }}
+          {% if form.name.errors %}<span class="auth-err">{{ form.name.errors|striptags }}</span>{% endif %}
+        </label>
+      </div>
+
+      <div class="wiz-step" data-step="1" hidden>
+        <h1 class="wiz-title">Jūsų prisijungimo duomenys</h1>
+        <label class="auth-field"><span>El. paštas</span>{{ form.email }}{% if form.email.errors %}<span class="auth-err">{{ form.email.errors|striptags }}</span>{% endif %}</label>
+        <label class="auth-field"><span>Slaptažodis</span>{{ form.password1 }}{% if form.password1.help_text %}<span class="auth-help">{{ form.password1.help_text|safe }}</span>{% endif %}{% if form.password1.errors %}<span class="auth-err">{{ form.password1.errors|striptags }}</span>{% endif %}</label>
+        <label class="auth-field"><span>Pakartokite slaptažodį</span>{{ form.password2 }}{% if form.password2.errors %}<span class="auth-err">{{ form.password2.errors|striptags }}</span>{% endif %}</label>
+      </div>
+
+      <div class="wiz-step" data-step="2" hidden>
+        <h1 class="wiz-title">Jūsų gimimo data</h1>
+        <label class="auth-field">{{ form.birthdate }}{% if form.birthdate.errors %}<span class="auth-err">{{ form.birthdate.errors|striptags }}</span>{% endif %}</label>
+      </div>
+
+      <div class="wiz-step" data-step="3" hidden>
+        <h1 class="wiz-title">Kur mus radote?</h1>
+        <label class="auth-field">{{ form.source }}{% if form.source.errors %}<span class="auth-err">{{ form.source.errors|striptags }}</span>{% endif %}</label>
+      </div>
+
+      <div class="wiz-nav">
+        <button type="button" class="button wiz-back" id="wiz-back" hidden>Atgal</button>
+        <button type="button" class="button primary wiz-next" id="wiz-next">Toliau</button>
+        <button type="submit" class="button primary wiz-submit" id="wiz-submit" hidden>Sukurti paskyrą</button>
+      </div>
+    </form>
+
+    <div class="auth-alt">Jau turite paskyrą? <a href="{% url 'dashboard-signin' %}">Prisijungti</a></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    var form = document.getElementById('signup-form');
+    if (!form) return;
+    var steps = Array.prototype.slice.call(form.querySelectorAll('.wiz-step'));
+    var dots = document.querySelectorAll('#wiz-progress .wiz-dot');
+    var back = document.getElementById('wiz-back');
+    var next = document.getElementById('wiz-next');
+    var submit = document.getElementById('wiz-submit');
+    var idx = 0;
+
+    function render() {
+      steps.forEach(function (s, i) { s.hidden = i !== idx; });
+      dots.forEach(function (d, i) { d.classList.toggle('active', i <= idx); });
+      back.hidden = idx === 0;
+      next.hidden = idx === steps.length - 1;
+      submit.hidden = idx !== steps.length - 1;
+      var f = steps[idx].querySelector('input, select');
+      if (f) try { f.focus(); } catch (e) {}
+    }
+
+    function validStep(i) {
+      var fields = steps[i].querySelectorAll('input, select');
+      for (var k = 0; k < fields.length; k++) {
+        var f = fields[k];
+        if (f.name === 'password2') {                       // confirm the passwords match
+          var p1 = form.querySelector('[name=password1]');
+          f.setCustomValidity(p1 && f.value !== p1.value ? 'Slaptažodžiai nesutampa.' : '');
+        }
+        if (!f.checkValidity()) { f.reportValidity(); return false; }
+      }
+      return true;
+    }
+
+    // "Already registered?" is only knowable server-side, so ask before leaving the email step —
+    // otherwise the visitor fills in two more steps and gets thrown back here by the final submit.
+    var emailCheckUrl = form.dataset.emailCheckUrl;
+    function emailField() { return steps[idx].querySelector('input[name=email]'); }
+    function showFieldError(field, msg) {
+      var label = field.closest('.auth-field') || field.parentNode;
+      var err = label.querySelector('.auth-err.js-err');
+      if (!err) {
+        err = document.createElement('span');
+        err.className = 'auth-err js-err';
+        label.appendChild(err);
+        field.addEventListener('input', function () { err.remove(); }, { once: true });
+      }
+      err.textContent = msg;
+      field.focus();
+    }
+    function advance() { if (idx < steps.length - 1) { idx++; render(); } }
+    function goNext() {
+      if (!validStep(idx)) return;
+      var email = emailField();
+      if (!email || !emailCheckUrl) { advance(); return; }
+      next.disabled = true;
+      fetch(emailCheckUrl + '?email=' + encodeURIComponent(email.value))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.taken) showFieldError(email, 'Šis el. paštas jau užregistruotas.');
+          else advance();
+        })
+        .catch(function () { advance(); })   // offline / server hiccup: let the submit decide
+        .then(function () { next.disabled = false; });
+    }
+
+    if (back) back.addEventListener('click', function () { if (idx > 0) { idx--; render(); } });
+    if (next) next.addEventListener('click', goNext);
+    // Enter used to hit the form's (hidden) submit button, which the browser then blocked silently
+    // because required fields on later steps are unfocusable — it just felt dead. Advance instead.
+    form.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA') return;
+      if (idx === steps.length - 1) return;   // last step: let the real submit through
+      e.preventDefault();
+      goNext();
+    });
+
+    // If the server bounced back with errors, open the first step that has one.
+    for (var i = 0; i < steps.length; i++) { if (steps[i].querySelector('.auth-err')) { idx = i; break; } }
+    render();
+  })();
+</script>
+{% endblock %}

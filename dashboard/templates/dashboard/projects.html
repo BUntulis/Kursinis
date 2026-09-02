@@ -1,0 +1,89 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Projects · DI testavimo platforma{% endblock %}
+{% block content %}
+<div class="projects-page">
+  <div class="projects-head">
+    <h1 class="projects-title">Projects</h1>
+    <div class="projects-head-actions">
+      <label class="projects-sort">Sort by
+        <select id="projects-sort" aria-label="Sort projects">
+          <option value="activity">Activity</option>
+          <option value="name">Name</option>
+        </select>
+      </label>
+      <a class="button primary" href="{% url 'dashboard-project-new' %}">New project</a>
+    </div>
+  </div>
+
+  <div class="projects-search">
+    <span class="projects-search-ico" aria-hidden="true">⌕</span>
+    <input type="text" id="projects-search" placeholder="Search projects…" autocomplete="off">
+  </div>
+
+  {% if projects %}
+  <div class="projects-grid" id="projects-grid">
+    {% for project in projects %}
+    <div class="project-card" data-name="{{ project.name|lower }}" data-created="{{ project.created_at|date:'U' }}">
+      <a class="project-card-main" href="{% url 'dashboard-project-detail' project.id %}">
+        <span class="project-card-ico">❏</span>
+        <span class="project-card-name">{{ project.name }}</span>
+        <span class="project-card-meta">{{ project.get_origin_display }} · {{ project.chats.count }} chat{{ project.chats.count|pluralize }} · {{ project.created_at|timesince }} ago</span>
+      </a>
+      <form class="project-card-del" method="post" action="{% url 'dashboard-project-delete' project.id %}" onsubmit="return confirm('Delete this project and its sandbox permanently?');">
+        {% csrf_token %}
+        <button class="project-card-del-btn" type="submit" aria-label="Delete project" title="Delete">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="projects-noresults" id="projects-noresults" hidden>No projects match your search.</div>
+  {% else %}
+  <div class="projects-empty">
+    <div class="projects-empty-ico" aria-hidden="true">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      </svg>
+    </div>
+    <div class="projects-empty-title">Looking to start a project?</div>
+    <div class="projects-empty-sub">Describe what you want to build and the agent scaffolds a Django app in its own sandbox — design, code, and a live preview in one space.</div>
+    <a class="button primary" href="{% url 'dashboard-project-new' %}">New project</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    var grid = document.getElementById('projects-grid');
+    if (!grid) return;
+    var search = document.getElementById('projects-search');
+    var sort = document.getElementById('projects-sort');
+    var noresults = document.getElementById('projects-noresults');
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.project-card'));
+
+    function applyFilter() {
+      var q = ((search && search.value) || '').trim().toLowerCase();
+      var visible = 0;
+      cards.forEach(function (c) {
+        var match = !q || (c.getAttribute('data-name') || '').indexOf(q) !== -1;
+        c.hidden = !match;
+        if (match) visible++;
+      });
+      if (noresults) noresults.hidden = visible !== 0;
+    }
+    function applySort() {
+      var mode = (sort && sort.value) || 'activity';
+      cards.slice().sort(function (a, b) {
+        if (mode === 'name') {
+          return (a.getAttribute('data-name') || '').localeCompare(b.getAttribute('data-name') || '');
+        }
+        return (parseInt(b.getAttribute('data-created'), 10) || 0) - (parseInt(a.getAttribute('data-created'), 10) || 0);
+      }).forEach(function (c) { grid.appendChild(c); });
+    }
+    if (search) search.addEventListener('input', applyFilter);
+    if (sort) sort.addEventListener('change', applySort);
+    applySort();
+  })();
+</script>
+{% endblock %}

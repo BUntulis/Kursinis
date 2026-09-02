@@ -1,0 +1,155 @@
+{% extends "dashboard/base.html" %}
+{% load static kursinis_assets %}
+{% block title %}Valdymo skydelis · DI testavimo platforma{% endblock %}
+{% block content %}
+<div class="home-hero">
+  <h1 class="home-greeting"><img class="brand-logo" src="{% static 'dashboard/logo.svg' %}" alt=""> <span class="greet"><span id="greeting-text"></span><span class="greet-caret" aria-hidden="true"></span></span></h1>
+
+  <div class="composer-wrap">
+  <form class="chat-input home-composer" id="home-composer" method="post" action="{% url 'dashboard-project-new' %}"
+        data-auth-gate data-gate-body="Chats and the projects they build are saved to your account. Sign in or create one to start building.">
+    {% csrf_token %}
+    <textarea id="home-composer-text" name="prompt" rows="1" required placeholder="Describe a project to build…" aria-label="Describe a project to build"></textarea>
+    <div class="chat-input-bar">
+      <div class="chat-input-tools">
+        <button type="button" class="chat-tool cm-add-btn" title="Add context" aria-haspopup="true" aria-expanded="false">+</button>
+        <button type="button" class="chat-tool boxed cm-actions-btn" title="Actions" aria-haspopup="true" aria-expanded="false">/</button>
+      </div>
+      <div class="chat-input-actions">
+        <button type="submit" class="chat-send-btn" aria-label="Start chat"><span class="send-arrow">↑</span></button>
+      </div>
+    </div>
+    <input type="hidden" name="model" id="model-input" value="">
+    <input type="hidden" name="effort" id="effort-input" value="medium">
+    <input type="hidden" name="thinking" value="on">
+    <input type="hidden" name="planning" value="">
+    <input type="hidden" name="pursue_goal" value="on">
+    <input type="hidden" name="auto_approve" value="">
+    <input type="hidden" name="from" value="home">
+    {% include "dashboard/_composer_menus.html" with mode="home" models=models cur_model="" cur_effort="medium" cur_thinking=1 cur_planning=0 cur_pursue=1 cur_auto=0 %}
+  </form>
+    <div class="composer-hint">Enter to send · Shift+Enter for newline</div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static_v 'dashboard/composer-menus.js' %}"></script>
+<script>
+  (function () {
+    var form = document.getElementById('home-composer');
+    var ta = document.getElementById('home-composer-text');
+    if (!form || !ta) return;
+    var sendBtn = form.querySelector('.chat-send-btn');
+    function grow() { ta.style.height = 'auto'; ta.style.height = Math.min(220, ta.scrollHeight) + 'px'; }
+    function updateSend() { if (sendBtn) sendBtn.classList.toggle('is-shown', !!ta.value.trim()); }  // appears once you type
+    ta.addEventListener('input', function () { grow(); updateSend(); });
+    ta.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!ta.value.trim()) return;
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+      }
+    });
+    // Block whitespace-only submits (the send button does a native submit that bypasses the Enter guard).
+    form.addEventListener('submit', function (e) { if (!ta.value.trim()) { e.preventDefault(); ta.focus(); } });
+    grow();
+    updateSend();
+    // + (Upload / Add context) + / (actions palette: Switch model / Effort / Thinking). On home the
+    // Context/upload items are disabled (no project yet); model/effort/thinking ride hidden inputs.
+    if (window.ComposerMenus) window.ComposerMenus.init(form, { mode: 'home' });
+  })();
+</script>
+<script>
+  /* Animated greeting: time-of-day + cycling profession + rotating language.
+     Driven entirely by the browser's LOCAL clock + LOCAL language. */
+  (function () {
+    var elx = document.getElementById('greeting-text');
+    if (!elx) return;
+    var caret = document.querySelector('.greet-caret');
+
+    var L = {
+      en: { m: 'Good morning', a: 'Good afternoon', e: 'Good evening', n: 'Good night', sep: ', ',
+            p: ['Researcher', 'Builder', 'Engineer', 'Creator', 'Explorer', 'Founder', 'Designer', 'Maker'] },
+      lt: { m: 'Labas rytas', a: 'Laba diena', e: 'Labas vakaras', n: 'Labanakt', sep: ', ',
+            p: ['Tyrėjau', 'Kūrėjau', 'Inžinieriau', 'Programuotojau', 'Architekte', 'Išradėjau'] },
+      es: { m: 'Buenos días', a: 'Buenas tardes', e: 'Buenas noches', n: 'Buenas noches', sep: ', ',
+            p: ['Investigador', 'Creador', 'Ingeniero', 'Explorador', 'Fundador', 'Diseñador'] },
+      fr: { m: 'Bonjour', a: 'Bon après-midi', e: 'Bonsoir', n: 'Bonne nuit', sep: ', ',
+            p: ['Chercheur', 'Créateur', 'Ingénieur', 'Explorateur', 'Fondateur', 'Designer'] },
+      de: { m: 'Guten Morgen', a: 'Guten Tag', e: 'Guten Abend', n: 'Gute Nacht', sep: ', ',
+            p: ['Forscher', 'Entwickler', 'Ingenieur', 'Schöpfer', 'Gründer', 'Designer'] },
+      it: { m: 'Buongiorno', a: 'Buon pomeriggio', e: 'Buonasera', n: 'Buonanotte', sep: ', ',
+            p: ['Ricercatore', 'Creatore', 'Ingegnere', 'Esploratore', 'Fondatore', 'Designer'] },
+      pt: { m: 'Bom dia', a: 'Boa tarde', e: 'Boa noite', n: 'Boa noite', sep: ', ',
+            p: ['Pesquisador', 'Criador', 'Engenheiro', 'Explorador', 'Fundador', 'Designer'] },
+      nl: { m: 'Goedemorgen', a: 'Goedemiddag', e: 'Goedenavond', n: 'Goedenacht', sep: ', ',
+            p: ['Onderzoeker', 'Maker', 'Ingenieur', 'Ontdekker', 'Oprichter', 'Ontwerper'] },
+      pl: { m: 'Dzień dobry', a: 'Dzień dobry', e: 'Dobry wieczór', n: 'Dobranoc', sep: ', ',
+            p: ['Badaczu', 'Twórco', 'Inżynierze', 'Odkrywco', 'Założycielu', 'Projektancie'] },
+      ja: { m: 'おはよう', a: 'こんにちは', e: 'こんばんは', n: 'おやすみ', sep: '、',
+            p: ['研究者', '開発者', 'エンジニア', 'クリエイター', '創業者', 'デザイナー'] }
+    };
+
+    function timeKey() {
+      var h = new Date().getHours();
+      if (h >= 5 && h < 12) return 'm';
+      if (h >= 12 && h < 18) return 'a';
+      if (h >= 18 && h < 22) return 'e';
+      return 'n';
+    }
+    function baseLang() {
+      var c = (navigator.language || 'en').slice(0, 2).toLowerCase();
+      return L[c] ? c : 'en';
+    }
+    function order() {
+      var local = baseLang();
+      var rest = Object.keys(L).filter(function (k) { return k !== local && k !== 'en'; });
+      for (var i = rest.length - 1; i > 0; i--) {   // shuffle the "random" tail
+        var j = Math.floor(Math.random() * (i + 1)); var t = rest[i]; rest[i] = rest[j]; rest[j] = t;
+      }
+      var o = [local];                              // 1) local language…
+      if (local !== 'en') o.push('en');             // 2) …then English…
+      return o.concat(rest);                        // 3) …then random
+    }
+
+    // Respect reduced-motion: just show the static localized greeting, no typing.
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      var lg = L[baseLang()];
+      elx.textContent = lg[timeKey()] + lg.sep + lg.p[0];
+      if (caret) caret.style.display = 'none';
+      return;
+    }
+
+    function rnd(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function pick(arr, not) { var v; do { v = arr[rnd(0, arr.length - 1)]; } while (arr.length > 1 && v === not); return v; }
+    async function type(s) { for (var i = 0; i < s.length; i++) { elx.textContent += s[i]; await sleep(rnd(45, 95)); } }
+    async function del(n) { for (var i = 0; i < n; i++) { elx.textContent = elx.textContent.slice(0, -1); await sleep(rnd(22, 45)); } }
+
+    var langs = order();
+    var li = 0;
+    (async function loop() {
+      while (true) {
+        var lang = L[langs[li % langs.length]];
+        var prof = pick(lang.p);
+        elx.textContent = '';
+        await type(lang[timeKey()] + lang.sep + prof);     // full greeting in this language
+        var swaps = rnd(2, 4);
+        for (var s = 0; s < swaps; s++) {                  // swap the profession a few times
+          await sleep(rnd(1900, 3400));
+          await del(prof.length);
+          prof = pick(lang.p, prof);
+          await type(prof);
+        }
+        await sleep(rnd(1800, 2600));
+        await del(elx.textContent.length);                 // wipe everything…
+        li++;                                              // …and switch language
+        await sleep(rnd(250, 450));
+      }
+    })();
+  })();
+</script>
+{% endblock %}

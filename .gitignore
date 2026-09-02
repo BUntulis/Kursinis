@@ -1,0 +1,97 @@
+# ================================================================
+#  Kursinis: Django kodo kūrimo automatizavimas su agentine sistema
+# ================================================================
+
+# ---------------------------------------------------------------- Python aplinka
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+pyvenv.cfg
+# pip diegimo artefaktai, atsirandantys diegiant be virtualios aplinkos.
+# DEMESIO: cia nerasyti "Scripts/", nes Windows sistemoje ta taisykle
+# sutampa su projekto katalogu "scripts/" ir ji pasalintu.
+Lib/
+share/
+
+# Svetimu paketu konsoles skriptai, netycia patekę i scripts/
+scripts/get_gprof
+scripts/get_objgraph
+scripts/jsondiff
+scripts/jsonpatch
+scripts/jsonpointer
+scripts/undill
+scripts/*.exe
+
+# ---------------------------------------------------------------- Paslaptys ir aplinkos kintamieji
+.env
+.env.local
+*.key
+*.pem
+*.p12
+credentials.json
+
+# ---------------------------------------------------------------- Duomenų bazės
+db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+
+# ---------------------------------------------------------------- Dirbtinio intelekto įrankių failai
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.continue/
+.github/copilot-instructions.md
+
+# ---------------------------------------------------------------- Modelių ir paieškos talpyklos
+.chroma/
+.ollama_library_cache/
+django-docs/
+*.gguf
+*.safetensors
+
+# ---------------------------------------------------------------- Agento sugeneruoti projektai ir bandymų duomenys
+project_sandboxes/
+workspaces/
+sandbox_runs/
+runs/
+results/
+data/
+
+# ---------------------------------------------------------------- Asmeninė kursinio darbo medžiaga
+kursinis_darbas/
+Kursiniai kitų/
+docs/
+*.docx
+~$*.docx
+*.pdf
+
+# ---------------------------------------------------------------- Surinkti statiniai failai ir priklausomybės
+staticfiles/
+node_modules/
+.parcel-cache/
+
+# ---------------------------------------------------------------- Žurnalai ir laikini failai
+*.log
+dashboard_runserver*.log
+*.tmp
+*.bak
+
+# ---------------------------------------------------------------- Redaktoriai ir operacinės sistemos
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

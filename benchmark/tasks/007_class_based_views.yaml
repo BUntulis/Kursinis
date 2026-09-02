@@ -1,0 +1,115 @@
+id: 007_class_based_views
+title: Class-based views (ListView, DetailView)
+difficulty: easy
+category: views
+
+description: |
+  Sukurk `articles` aplikaciją su publikuotų straipsnių peržiūra.
+
+  Tikslas:
+    - Lankytojai turi matyti tik publikuotus straipsnius sąraše ir detalėje.
+
+  Modelis `Article`:
+    - `title`: `CharField(max_length=200)`.
+    - `slug`: `SlugField(unique=True)`.
+    - `content`: `TextField`.
+    - `is_published`: `BooleanField(default=False)`.
+    - `__str__` grąžina `title`.
+
+  Vaizdai:
+    - `ArticleListView(ListView)`:
+        * `model = Article`.
+        * `paginate_by = 10`.
+        * `context_object_name = "articles"`.
+        * QuerySet filtruoja tik `is_published=True`.
+        * Rikiuoja pagal `-id`.
+    - `ArticleDetailView(DetailView)`:
+        * `model = Article`.
+        * `slug_url_kwarg = "slug"`.
+        * Detalė taip pat pasiekiama tik publikuotiems straipsniams.
+
+  URL:
+    - `/articles/` -> `ArticleListView`, `name="article-list"`.
+    - `/articles/<slug:slug>/` -> `ArticleDetailView`, `name="article-detail"`.
+
+  Šablonai:
+    - `articles/templates/articles/article_list.html`.
+    - `articles/templates/articles/article_detail.html`.
+    - Šablonai turi atvaizduoti straipsnių pavadinimus be hardcodintų duomenų.
+
+expected_files:
+  - articles/models.py
+  - articles/views.py
+  - articles/urls.py
+  - articles/templates/articles/article_list.html
+  - articles/templates/articles/article_detail.html
+
+expected_implementation_summary: |
+  Teisingas sprendimas pateikia `Article` modelį, `ListView` ir `DetailView`, kurie abu filtruoja nepublikuotus straipsnius, naudoja slug maršrutus, paginaciją, tvarkingą kontekstą ir realius Django šablonus.
+
+unit_test_plan:
+  - Patikrinti modelio laukus ir `__str__`.
+  - Patikrinti URL reverse ir HTTP statusus.
+  - Patikrinti, kad sąraše ir detalėje nerodomi nepublikuoti straipsniai.
+  - Patikrinti rikiavimą, konteksto vardą ir paginaciją.
+  - Patikrinti, kad nežinomas arba nepublikuotas slug grąžina 404.
+
+scoring_criteria:
+  Funkcinis korektiskumas: 30
+  Modeliu ir duomenu bazes dizainas: 15
+  Validacija ir krastiniai atvejai: 15
+  Autentifikacija ir teises: 10
+  API arba vaizdu elgsena: 10
+  Suderinamumas su testais: 10
+  Kodo kokybe ir palaikomumas: 5
+  Saugumas ir atsparumas: 5
+
+reference_tests: |
+  import pytest
+  from django.test import Client
+  from django.urls import reverse
+  from articles.models import Article
+
+  pytestmark = pytest.mark.django_db
+
+  @pytest.fixture
+  def client():
+      return Client()
+
+  def test_model_contract():
+      assert Article._meta.get_field("title").max_length == 200
+      assert Article._meta.get_field("slug").unique is True
+      assert Article._meta.get_field("is_published").default is False
+      assert str(Article(title="Hello", slug="hello", content="World")) == "Hello"
+
+  def test_list_only_published_with_context_and_order(client):
+      first = Article.objects.create(title="First", slug="first", content="...", is_published=True)
+      hidden = Article.objects.create(title="Hidden", slug="hidden", content="...", is_published=False)
+      second = Article.objects.create(title="Second", slug="second", content="...", is_published=True)
+      resp = client.get(reverse("article-list"))
+      assert resp.status_code == 200
+      assert list(resp.context["articles"]) == [second, first]
+      assert hidden not in resp.context["articles"]
+      assert b"Second" in resp.content
+      assert b"Hidden" not in resp.content
+
+  def test_detail_only_published(client):
+      Article.objects.create(title="Hello", slug="hello", content="World", is_published=True)
+      Article.objects.create(title="Draft", slug="draft", content="Secret", is_published=False)
+      ok = client.get(reverse("article-detail", kwargs={"slug": "hello"}))
+      missing = client.get(reverse("article-detail", kwargs={"slug": "draft"}))
+      assert ok.status_code == 200
+      assert b"Hello" in ok.content
+      assert missing.status_code == 404
+
+  def test_detail_404_for_unknown(client):
+      resp = client.get("/articles/missing/")
+      assert resp.status_code == 404
+
+  def test_pagination_enabled(client):
+      for index in range(11):
+          Article.objects.create(title=f"A{index}", slug=f"a{index}", content="...", is_published=True)
+      resp = client.get("/articles/")
+      assert resp.status_code == 200
+      assert resp.context["is_paginated"] is True
+      assert len(resp.context["articles"]) == 10
